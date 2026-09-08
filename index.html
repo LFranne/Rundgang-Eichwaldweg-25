@@ -235,6 +235,26 @@
         /* Der Punkt markiert einen Blickwinkel, nicht einen eigenen Raum */
         .panel .blicke button::before { content: '·'; color: var(--gold2); margin-right: 8px; }
 
+        /* Reiter im Menü. `.tabs` gibt es schon im Werkzeug; hier muss nur
+           zurückgenommen werden, was `.panel button` allen Knöpfen aufdrückt
+           (blockweise, volle Breite, linksbündig) — sonst stehen die Reiter
+           untereinander statt nebeneinander. */
+        .panel .paneltabs { margin: 2px 2px 8px; }
+        .panel .paneltabs button { display: flex; align-items: center; justify-content: center; gap: 6px;
+                                   width: auto; text-align: center; }
+        .panel .paneltabs button:hover { background: rgba(187,208,52,0.18); }
+        .panel .paneltabs button.sel { background: var(--wald2); font-weight: 600; color: var(--dust); }
+        .panel .paneltabs button.sel:hover { background: var(--wald2); }
+        /* Anzahl der Infopoints am Reiter. Leer bei null, damit keine „0" steht. */
+        .panel .paneltabs .anz:not(:empty) { font-size: 11.5px; font-style: normal; padding: 1px 6px;
+                                             border-radius: 9px; background: rgba(242,239,237,0.16);
+                                             font-variant-numeric: tabular-nums; }
+
+        .panel #tagList { max-height: 44vh; overflow-y: auto; }
+        /* Der goldene Punkt greift die Farbe des Infopoints im Bild auf */
+        .panel #tagList button::before { content: '●'; color: var(--gold3); font-size: 9px;
+                                         margin-right: 9px; vertical-align: 1px; }
+
         /* ===== WERKZEUG: Ports und Infopoints setzen ===== */
         .tool { position: absolute; top: 88px; right: 30px; z-index: 40; width: 274px; border-radius: 12px;
                 padding: 16px; background: rgba(32,40,41,0.96); backdrop-filter: blur(12px);
@@ -382,23 +402,10 @@
         .tagcard .taglink.show { display: inline-block; }
         .tagcard .taglink:hover { background: var(--gold3); }
 
-        /* Zählung oben mittig, wie „2 of 53" in der Referenz */
-        .tagnav { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); z-index: 30;
-                  display: none; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 20px;
-                  background: rgba(32,40,41,0.58); backdrop-filter: blur(6px); }
-        .tagnav.show { display: flex; }
-        .tagnav span { color: var(--dust); font-size: 14px; min-width: 72px; text-align: center;
-                       font-variant-numeric: tabular-nums; }
-        .tagnav button { width: 28px; height: 28px; border: none; border-radius: 50%; background: none;
-                         cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .tagnav button:hover { background: rgba(187,208,52,0.22); }
-        .tagnav svg { width: 15px; height: 15px; fill: var(--dust); }
-
-        /* Bei schmalem Fenster rutscht die Zählung unter die Kopfzeile,
-           damit sie den Objektnamen nicht überdeckt */
-        @media (max-width: 800px) {
-            .tagnav { top: 74px; }
-        }
+        /* Die Infopoints hatten hier eine eigene Leiste oben in der Mitte
+           (`.tagnav`). Entfernt am 08.09.2026: für eine Nebensache zu
+           aufdringlich, und auf dem Handy stand sie mitten im Bild. Sie sind
+           jetzt ein Reiter im Menü, siehe `.paneltabs`. */
 
         /* Bei schmalem Fenster würden linke und rechte Leiste überlappen.
            Der Stationsname tritt dann zurück – er steht auch im Menü. */
@@ -415,6 +422,41 @@
             .variants.show { position: absolute; bottom: 76px; left: 0; }
             .areas { left: 20px; bottom: 132px; }
             .plan { left: 20px; bottom: 132px; }
+        }
+
+        /* Auf dem Handy überlappten die beiden Leisten trotzdem — die Knöpfe
+           standen übereinander und waren am Rand abgeschnitten. Nachgerechnet
+           bei 44 px Knopf und 13 px Abstand:
+             links   44 + 13 + 5×44 = 277 px
+             rechts  4×44 + 3×13    = 215 px   (im Gastblick, ohne Zielkreuz)
+             mit 2×20 px Rand       = 532 px Bedarf
+           Ein Telefon hat hochkant 360 bis 412 px. Also kleinere Knöpfe,
+           engere Abstände, schmalerer Rand — und die Zoomknöpfe fallen bei
+           Fingerbedienung weg, siehe unten.
+             links   38 +  6 + 3×38 = 158 px
+             rechts  4×38 + 3×6     = 170 px
+             mit 2×10 px Rand       = 348 px, bleibt bei 360 px noch Luft */
+        @media (max-width: 560px) {
+            .btn { width: 38px; height: 38px; }
+            .btn svg { width: 17px; height: 17px; }
+            .bar, .bar-right { gap: 6px; bottom: 14px; }
+            .bar { left: 10px; }
+            .bar-right { right: 10px; }
+            .brand { top: 14px; left: 14px; }
+            .brand-name { font-size: 20px; }
+            .compass { top: 14px; right: 14px; }
+            .variants.show { bottom: 64px; }
+            .areas { left: 10px; bottom: 116px; }
+            .plan { left: 10px; bottom: 116px; }
+            .panel { right: 10px; bottom: 64px; left: 10px; min-width: 0; }
+        }
+
+        /* Bei Fingerbedienung erledigen zwei Finger das Zoomen. Die beiden
+           Knöpfe kosten 88 px, die auf einem Telefon gebraucht werden. Geprüft
+           wird die Bedienart, nicht die Breite: ein schmal gezogenes Fenster am
+           Rechner hat kein Zoomen mit zwei Fingern und behält die Knöpfe. */
+        @media (hover: none) and (pointer: coarse) {
+            #zoomInBtn, #zoomOutBtn { display: none; }
         }
 
         /* ===== LADEANZEIGE ===== */
@@ -463,16 +505,6 @@
                  rel="noopener noreferrer", damit die geöffnete Seite keinen
                  Zugriff auf das Fenster der Tour bekommt. -->
             <a class="taglink" id="tagLink" target="_blank" rel="noopener noreferrer"></a>
-        </div>
-
-        <div class="tagnav" id="tagNav">
-            <button id="tagPrev" title="Vorheriger Infopoint">
-                <svg viewBox="0 0 24 24"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z"/></svg>
-            </button>
-            <span id="tagCount">—</span>
-            <button id="tagNext" title="Nächster Infopoint">
-                <svg viewBox="0 0 24 24"><path d="M8.6 7.4 10 6l6 6-6 6-1.4-1.4 4.6-4.6z"/></svg>
-            </button>
         </div>
 
         <!-- Kopfzeile -->
@@ -554,13 +586,23 @@
             </button>
         </div>
 
-        <!-- Seitenmenü -->
+        <!-- Seitenmenü. Zwei Reiter: die Stationen und die Infopoints. Die
+             Infopoints hatten vorher eine eigene Leiste oben in der Mitte —
+             die war zu aufdringlich für eine Nebensache und stand auf dem
+             Handy mitten im Bild. -->
         <div class="panel" id="panel">
-            <h4>Suche</h4>
-            <input type="text" class="search" id="searchInput" placeholder="Station suchen …">
-            <h4>Stationen</h4>
-            <div id="stationList"></div>
-            <div id="summary"></div>
+            <div class="tabs paneltabs">
+                <button id="tabStationenBtn" class="sel">Stationen</button>
+                <button id="tabPunkteBtn">Infopoints<i class="anz" id="tabPunkteAnz"></i></button>
+            </div>
+            <div id="tabStationen">
+                <input type="text" class="search" id="searchInput" placeholder="Station suchen …">
+                <div id="stationList"></div>
+                <div id="summary"></div>
+            </div>
+            <div id="tabPunkte" hidden>
+                <div id="tagList"></div>
+            </div>
         </div>
 
         <!-- Bedienhilfe -->
@@ -1007,6 +1049,19 @@
         // In der veröffentlichten Fassung fest abgeschaltet (veroeffentlichen.js).
         const WERKZEUG = false;
 
+        // Wird das Gerät mit dem Finger bedient? Geprüft wird die Bedienart,
+        // nicht die Bildschirmbreite: ein schmal gezogenes Fenster am Rechner
+        // hat weiter eine Maus. `hover: none` und `pointer: coarse` zusammen
+        // treffen Telefone und Tablets, aber nicht Notebooks mit
+        // Berührungsbildschirm, wo beides zur Verfügung steht.
+        function fingerBedienung() {
+            try {
+                return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+            } catch (err) {
+                return false;      // sehr alter Browser: wie am Rechner behandeln
+            }
+        }
+
         // =====================================================================
         //  GRUNDRISS
         //  Maße aus der Wohnflächenberechnung von 1984 (Wohnung 2, UG), die
@@ -1141,9 +1196,42 @@
         function ringScale(dist) {
             return dist > RING_REF ? dist / RING_REF : 1;
         }
+        // Bezugsgröße für die Ziehgeschwindigkeit. Bewusst eine Konstante:
+        // wie schnell sich das Bild unter dem Finger dreht, soll nicht von der
+        // Fensterform abhängen.
         const BASE_FOV  = 75;
         const FOV_MIN   = 32;
         const FOV_MAX   = 100;
+
+        // three.js meint mit `fov` den SENKRECHTEN Öffnungswinkel. Wie breit
+        // das Blickfeld ist, hängt damit an der Fensterform:
+        //
+        //   waagerecht = 2 · atan( tan(senkrecht/2) · Breite/Höhe )
+        //
+        // Bei festen 75° senkrecht heißt das 107° Breite auf 1920×1080, aber nur
+        // **46°** auf einem hochkant gehaltenen Handy — dort sah die Tour aus,
+        // als wäre sie hineingezoomt. Deshalb wird nicht der senkrechte Winkel
+        // festgehalten, sondern der waagerechte, und der senkrechte daraus
+        // gerechnet.
+        //
+        // 110° ist so gewählt, dass am Rechner praktisch alles bleibt wie es war
+        // (1920×1080 ergibt 77° senkrecht statt 75). Hochkant reicht kein
+        // senkrechter Winkel aus, um 110° Breite zu erreichen — dort greift die
+        // Obergrenze von 100°, und es bleiben etwa 67° Breite. Beides zugleich
+        // geht bei einem hochkanten Fenster nicht; so machen es auch Street
+        // View und Matterport.
+        const ZIEL_HFOV = 110;
+
+        function startFov() {
+            const a = Math.max(0.2, viewW / Math.max(1, viewH));
+            const senkrecht = 2 * Math.atan(Math.tan(ZIEL_HFOV / 2 * Math.PI / 180) / a) * 180 / Math.PI;
+            return Math.max(FOV_MIN, Math.min(FOV_MAX, senkrecht));
+        }
+
+        // Sobald der Besucher selbst zoomt, wird der Winkel nicht mehr an die
+        // Fensterform angepasst — sonst würde ein Drehen des Handys seine
+        // Einstellung überschreiben.
+        let zoomBeruehrt = false;
         const LEGACY_ASPECT = 1536 / 774;   // Fenstermaß, als die alten x/y-Ports gemessen wurden
         const DEG = Math.PI / 180;
 
@@ -1166,6 +1254,11 @@
             viewW = viewer.clientWidth;
             viewH = viewer.clientHeight;
             camera.aspect = viewW / viewH;
+            // Blickfeld an die neue Fensterform anpassen — auch beim ersten
+            // Aufruf, der die Starteinstellung setzt. Hat der Besucher selbst
+            // gezoomt, bleibt seine Wahl stehen; sonst würde ein Drehen des
+            // Handys sie überschreiben.
+            if (!zoomBeruehrt) camera.fov = startFov();
             camera.updateProjectionMatrix();
             renderer.setSize(viewW, viewH);
         }
@@ -1695,7 +1788,6 @@
         // =====================================================================
         const tagLayer = document.getElementById('tagLayer');
         const tagCard = document.getElementById('tagCard');
-        const tagNav = document.getElementById('tagNav');
         let tagEls = [];         // { el, dir, index }
         let openTag = null;      // Index in tags
 
@@ -1741,8 +1833,7 @@
                 tagEls.push({ el: el, dir: dirFromYawPitch(ort.yaw, ort.pitch), index: index });
               });
             });
-            tagNav.classList.toggle('show', tags.length > 0);
-            updateTagCount();
+            renderPunkteReiter();
             // Nach jedem Neuaufbau die Hervorhebung des bearbeiteten Punktes
             // wiederherstellen — die alten Elemente sind weg.
             if (typeof markTagSelection === 'function') markTagSelection();
@@ -1778,15 +1869,45 @@
             tagCard.style.top = y + 'px';
         }
 
-        // Beschriftung der Infopoint-Leiste. Solange keine Karte offen ist, gibt
-        // es keinen „nullten" Punkt — „0 von 1" las sich wie ein Defekt. Dann
-        // steht dort die reine Anzahl, sonst die Stelle in der Reihe.
-        function updateTagCount() {
-            const n = tags.length;
-            document.getElementById('tagCount').textContent =
-                !n ? '—'
-                   : openTag === null ? n + (n === 1 ? ' Infopoint' : ' Infopoints')
-                                      : (openTag + 1) + ' von ' + n;
+        // Infopoints als Liste im Menü, zweiter Reiter neben den Stationen.
+        // Vorher hing dafür eine Leiste oben mitten im Bild — für eine
+        // Nebensache zu aufdringlich, und am Handy stand sie im Weg.
+        //
+        // Die Liste nennt zu jedem Punkt die Station, an der er hängt. Bei
+        // mehreren Platzierungen alle, denn dann ist dieselbe Sache von
+        // verschiedenen Standpunkten zu sehen.
+        // Name bewusst nicht `renderTagList` — so heißt schon die Liste im
+        // Werkzeug (Zeile ~3120). Zwei Funktionsdeklarationen mit gleichem
+        // Namen im selben Skript sind kein Fehler: die spätere überschreibt die
+        // frühere stillschweigend. Beim ersten Versuch liefen dadurch alle
+        // Aufrufe in die Werkzeugliste, der Reiter blieb leer, und es gab
+        // keinerlei Fehlermeldung.
+        function renderPunkteReiter() {
+            const anz = document.getElementById('tabPunkteAnz');
+            if (anz) anz.textContent = tags.length ? String(tags.length) : '';
+
+            const box = document.getElementById('tagList');
+            if (!box) return;
+            box.innerHTML = '';
+            if (!tags.length) {
+                const p = document.createElement('div');
+                p.className = 'none';
+                p.textContent = 'Noch keine Infopoints.';
+                box.appendChild(p);
+                return;
+            }
+            tags.forEach((tag, i) => {
+                const b = document.createElement('button');
+                b.appendChild(document.createTextNode(tagLabel(tag)));
+                const s = document.createElement('small');
+                const wo = tagPlacements(tag)
+                    .map(o => { const n = nodes.find(x => x.id === o.nodeId); return n ? n.name : o.nodeId; });
+                s.textContent = [...new Set(wo)].join(' · ');
+                b.appendChild(s);
+                if (i === openTag) b.className = 'current';
+                b.addEventListener('click', () => { panel.classList.remove('open'); gehZuTag(i); });
+                box.appendChild(b);
+            });
         }
 
         function showTag(index) {
@@ -1814,7 +1935,7 @@
             }
 
             tagCard.classList.add('open');
-            updateTagCount();
+            renderPunkteReiter();        // markiert den offenen Punkt in der Liste
             placeCard();
         }
 
@@ -1822,7 +1943,7 @@
             openTag = null;
             tagCard.classList.remove('open');
             tagEls.forEach(t => t.el.classList.remove('active'));
-            updateTagCount();
+            renderPunkteReiter();
         }
 
         // Blick weich auf eine Richtung schwenken
@@ -1836,26 +1957,26 @@
             });
         }
 
-        async function stepTag(delta) {
-            if (!tags.length) return;
-            const from = openTag === null ? -1 : openTag;
-            const next = (from + delta + tags.length) % tags.length;
-            const tag = tags[next];
+        // Zu einem Infopoint gehen und ihn öffnen — aus der Liste im Menü.
+        // Hieß vorher stepTag(delta) und war nur über die Pfeile der alten
+        // Leiste erreichbar; die Liste nennt den Punkt direkt.
+        async function gehZuTag(index) {
+            const tag = tags[index];
+            if (!tag) return;
             // Bei mehreren Platzierungen die des aktuellen Standpunkts nehmen –
             // dann bleibt man stehen, statt für denselben Punkt umzuziehen.
             const orte = tagPlacements(tag);
             const ort = orte.find(o => o.nodeId === currentNodeId) || orte[0];
             closeTag();
+            stopAutoplay();
             if (ort.nodeId !== currentNodeId) {
                 await goToNode(ort.nodeId);
             }
             await turnTo(ort.yaw, ort.pitch);
-            showTag(next);
+            showTag(index);
         }
 
         document.getElementById('tagClose').addEventListener('click', closeTag);
-        document.getElementById('tagPrev').addEventListener('click', () => stepTag(-1));
-        document.getElementById('tagNext').addEventListener('click', () => stepTag(1));
 
         // =====================================================================
         //  TEXTUREN mit kleinem Zwischenspeicher
@@ -2255,6 +2376,7 @@
         canvas.addEventListener('wheel', e => {
             e.preventDefault();
             camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, camera.fov + e.deltaY * 0.045));
+            zoomBeruehrt = true;
             camera.updateProjectionMatrix();
         }, { passive: false });
 
@@ -2320,6 +2442,7 @@
                 const jetzt = fingerAbstand(e.touches);
                 if (jetzt > 0) {
                     camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, pinchFov * pinchAb / jetzt));
+                    zoomBeruehrt = true;
                     camera.updateProjectionMatrix();
                 }
             }
@@ -2456,10 +2579,35 @@
 
         document.getElementById('searchInput').addEventListener('input', renderStationList);
 
+        // ===== REITER IM MENÜ: Stationen / Infopoints =====
+        let menuReiter = 'stationen';
+
+        function reiterZeigen(welcher) {
+            menuReiter = welcher;
+            const stationen = welcher === 'stationen';
+            document.getElementById('tabStationen').hidden = !stationen;
+            document.getElementById('tabPunkte').hidden = stationen;
+            document.getElementById('tabStationenBtn').classList.toggle('sel', stationen);
+            document.getElementById('tabPunkteBtn').classList.toggle('sel', !stationen);
+            if (stationen) renderStationList(); else renderPunkteReiter();
+        }
+
+        document.getElementById('tabStationenBtn').addEventListener('click', () => {
+            reiterZeigen('stationen');
+            document.getElementById('searchInput').focus();
+        });
+        document.getElementById('tabPunkteBtn').addEventListener('click', () => reiterZeigen('punkte'));
+
         document.getElementById('menuBtn').addEventListener('click', () => {
             const auf = panel.classList.toggle('open');
             areaBox.classList.remove('open');
-            if (auf) { renderSummary(); renderStationList(); document.getElementById('searchInput').focus(); }
+            if (!auf) return;
+            renderSummary();
+            reiterZeigen(menuReiter);
+            // Das Tastenfeld soll auf dem Handy nicht von selbst aufspringen —
+            // es verdeckt dort das halbe Menü.
+            if (menuReiter === 'stationen' && !fingerBedienung())
+                document.getElementById('searchInput').focus();
         });
 
         // ===== BEREICHSWAHL =====
@@ -2707,7 +2855,10 @@
             stopAutoplay();
             yaw = z.yaw;
             pitch = z.pitch;
+            // Ein geteilter Link nennt den Blickwinkel ausdrücklich — der gilt
+            // dann und wird nicht von der Fensteranpassung überschrieben.
             camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, z.fov));
+            zoomBeruehrt = true;
             camera.updateProjectionMatrix();
             if (z.id !== currentNodeId) goToNode(z.id, { variant: z.variant, exakt: true });
             else if (z.variant !== currentVariant) switchVariant(z.variant);
@@ -2737,17 +2888,9 @@
         const HELP_KEY = 'aig-tour-hilfe-gesehen';
 
         // Auf einem Gerät ohne Maus standen hier „Mausrad", „Pfeiltasten" und
-        // „Leertaste" — Anweisungen, die es dort nicht gibt. Geprüft wird auf
-        // Fingerbedienung, nicht auf Bildschirmbreite: ein schmales Fenster am
-        // Rechner hat weiter eine Maus. `hover: none` und `pointer: coarse`
-        // zusammen treffen Telefone und Tablets, aber nicht Notebooks mit
-        // Berührungsbildschirm, wo beides zur Verfügung steht.
+        // „Leertaste" — Anweisungen zu Geräten, die es dort nicht gibt.
         (function hilfeZeilen() {
-            let finger = false;
-            try {
-                finger = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-            } catch (err) { /* sehr alter Browser: bei der Mausfassung bleiben */ }
-            if (!finger) return;
+            if (!fingerBedienung()) return;
             document.getElementById('helpList').innerHTML =
                 '<dt>Wischen</dt><dd>Blickrichtung drehen</dd>' +
                 '<dt>Zwei Finger</dt><dd>Näher heran und weiter weg</dd>' +
@@ -3513,15 +3656,20 @@
 
         document.getElementById('zoomInBtn').addEventListener('click', () => {
             camera.fov = Math.max(FOV_MIN, camera.fov - 9);
+            zoomBeruehrt = true;
             camera.updateProjectionMatrix();
         });
         document.getElementById('zoomOutBtn').addEventListener('click', () => {
             camera.fov = Math.min(FOV_MAX, camera.fov + 9);
+            zoomBeruehrt = true;
             camera.updateProjectionMatrix();
         });
         document.getElementById('resetBtn').addEventListener('click', () => {
             yaw = 0; pitch = 0;
-            camera.fov = BASE_FOV;
+            // Zurück auf die Starteinstellung, die zur Fensterform passt — nicht
+            // stur auf BASE_FOV, das war der Grund für den zu engen Blick.
+            zoomBeruehrt = false;
+            camera.fov = startFov();
             camera.updateProjectionMatrix();
         });
         document.getElementById('fullBtn').addEventListener('click', () => {
@@ -3599,7 +3747,10 @@
         if (ausLink) {
             yaw = ausLink.yaw;
             pitch = ausLink.pitch;
+            // Der Link nennt den Blickwinkel ausdrücklich; er gilt vor der
+            // Anpassung an die Fensterform.
             camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, ausLink.fov));
+            zoomBeruehrt = true;
             camera.updateProjectionMatrix();
         }
         goToNode(ausLink ? ausLink.id : START_NODE,
