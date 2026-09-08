@@ -1,5 +1,5 @@
 Eichwaldweg 25 — 360°-Rundgang, Fassung für die Veröffentlichung
-Erzeugt am 8.9.2026, 10:42:00 von veroeffentlichen.js
+Erzeugt am 8.9.2026, 11:15:00 von veroeffentlichen.js
 
 DIESER ORDNER geht online, und nur dieser. Inhalt vollständig hochladen,
 die Ordnerstruktur beibehalten. index.html ist die Startseite.

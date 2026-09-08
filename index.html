@@ -1771,9 +1771,15 @@
             tagCard.style.top = y + 'px';
         }
 
+        // Beschriftung der Infopoint-Leiste. Solange keine Karte offen ist, gibt
+        // es keinen „nullten" Punkt — „0 von 1" las sich wie ein Defekt. Dann
+        // steht dort die reine Anzahl, sonst die Stelle in der Reihe.
         function updateTagCount() {
+            const n = tags.length;
             document.getElementById('tagCount').textContent =
-                tags.length ? ((openTag === null ? 0 : openTag + 1) + ' von ' + tags.length) : '—';
+                !n ? '—'
+                   : openTag === null ? n + (n === 1 ? ' Infopoint' : ' Infopoints')
+                                      : (openTag + 1) + ' von ' + n;
         }
 
         function showTag(index) {
