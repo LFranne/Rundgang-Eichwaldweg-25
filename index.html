@@ -38,7 +38,11 @@
         .scrim.top { top: 0; height: 132px; background: linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0)); }
         .scrim.bottom { bottom: 0; height: 118px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.42)); }
         /* Der Zeiger wird als Waldsignet gesetzt, siehe setLogoCursor() */
-        canvas { display: block; }
+        /* touch-action: none übergibt uns die Fingergesten. Ohne das scrollt und
+           zoomt der Browser auf dem Handy die Seite selbst, und die eigenen
+           touchmove-Ereignisse kommen gar nicht erst an. Ein getipptes `click`
+           wird trotzdem noch erzeugt — die Ports funktionieren also weiter. */
+        canvas { display: block; touch-action: none; }
 
         /* ===== KOPFZEILE oben links: Logo + Objekt ===== */
         .brand { position: absolute; top: 26px; left: 30px; z-index: 30; pointer-events: none;
@@ -566,7 +570,10 @@
                     <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
                 </button>
                 <h3>So bewegen Sie sich</h3>
-                <dl>
+                <!-- Inhalt kommt aus hilfeZeilen() — auf dem Handy stehen hier
+                     andere Zeilen, weil es kein Mausrad und keine Tasten gibt.
+                     Die Mausfassung steht als Rückfallebene im Markup. -->
+                <dl id="helpList">
                     <dt>Ziehen</dt><dd>Blickrichtung drehen</dd>
                     <dt>Mausrad</dt><dd>Näher heran und weiter weg</dd>
                     <dt>Ring am Boden</dt><dd>Dorthin gehen</dd>
@@ -2252,6 +2259,87 @@
         }, { passive: false });
 
         // =====================================================================
+        //  FINGER
+        //  Auf dem Handy gab es kein Umschauen: die Tour hörte nur auf
+        //  mousedown/mousemove/mouseup, und die erzeugt ein Touchgerät nicht.
+        //  Die Ports gingen trotzdem, weil der Browser beim Tippen ein `click`
+        //  nachliefert — deshalb fiel es lange nicht auf.
+        //
+        //  Bewusst ein eigener Block statt einer Umstellung auf Pointer Events:
+        //  der Mausteil ist durchgetestet (Ziehrichtung, rechte Taste ohne
+        //  Wirkung, Zielkreuz, Hover-Hinweise, Werkzeugmodus). Fingergesten
+        //  haben andere Regeln — kein Hover, kein Zielkreuz, und Zoomen läuft
+        //  über zwei Finger statt über das Mausrad.
+        //
+        //  Ein Finger dreht, zwei Finger zoomen. Das Tippen selbst wird nicht
+        //  angefasst: es kommt weiter als `click` an, und `didDrag` verhindert
+        //  dort wie bei der Maus, dass ein Wischen als Klick zählt.
+        // =====================================================================
+        let pinchAb = 0;        // Fingerabstand beim Aufsetzen
+        let pinchFov = 0;       // Blickwinkel beim Aufsetzen
+
+        const fingerAbstand = t =>
+            Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+        function fingerZiehenAn(t) {
+            dragging = true;
+            lastX = t.clientX; lastY = t.clientY;
+        }
+
+        canvas.addEventListener('touchstart', e => {
+            reticle.visible = false;     // gehört zur Maus
+            hidePortHint();
+            if (e.touches.length === 1) {
+                didDrag = false;
+                fingerZiehenAn(e.touches[0]);
+            } else if (e.touches.length === 2) {
+                // Zwei Finger: nicht drehen, sondern zoomen. `didDrag` bleibt
+                // gesetzt, damit das Absetzen nicht als Tippen durchgeht.
+                dragging = false;
+                didDrag = true;
+                pinchAb = fingerAbstand(e.touches);
+                pinchFov = camera.fov;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', e => {
+            if (e.touches.length === 1 && dragging) {
+                const t = e.touches[0];
+                const dx = t.clientX - lastX, dy = t.clientY - lastY;
+                // Etwas träger als bei der Maus: ein Finger ist ungenauer, und
+                // 2 px lösten schon beim Aufsetzen aus.
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag = true;
+                // Gleiche Regel wie bei der Maus: das Bild folgt der Hand.
+                const speed = 0.12 * (camera.fov / BASE_FOV);
+                yaw   += dx * speed;
+                pitch += dy * speed;
+                pitch = Math.max(-85, Math.min(85, pitch));
+                lastX = t.clientX; lastY = t.clientY;
+            } else if (e.touches.length === 2 && pinchAb) {
+                // Finger auseinander = näher heran = kleinerer Blickwinkel.
+                const jetzt = fingerAbstand(e.touches);
+                if (jetzt > 0) {
+                    camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, pinchFov * pinchAb / jetzt));
+                    camera.updateProjectionMatrix();
+                }
+            }
+        }, { passive: true });
+
+        function fingerAb(e) {
+            if (e.touches.length === 0) {
+                dragging = false;
+                pinchAb = 0;
+            } else if (e.touches.length === 1) {
+                // Vom Zoomen zurück auf einen Finger: neu ansetzen, sonst
+                // springt das Bild um den Abstand der beiden Finger.
+                pinchAb = 0;
+                fingerZiehenAn(e.touches[0]);
+            }
+        }
+        canvas.addEventListener('touchend', fingerAb, { passive: true });
+        canvas.addEventListener('touchcancel', fingerAb, { passive: true });
+
+        // =====================================================================
         //  OBERFLÄCHE
         // =====================================================================
         const panel = document.getElementById('panel');
@@ -2647,6 +2735,26 @@
         // ===== BEDIENHILFE =====
         const help = document.getElementById('help');
         const HELP_KEY = 'aig-tour-hilfe-gesehen';
+
+        // Auf einem Gerät ohne Maus standen hier „Mausrad", „Pfeiltasten" und
+        // „Leertaste" — Anweisungen, die es dort nicht gibt. Geprüft wird auf
+        // Fingerbedienung, nicht auf Bildschirmbreite: ein schmales Fenster am
+        // Rechner hat weiter eine Maus. `hover: none` und `pointer: coarse`
+        // zusammen treffen Telefone und Tablets, aber nicht Notebooks mit
+        // Berührungsbildschirm, wo beides zur Verfügung steht.
+        (function hilfeZeilen() {
+            let finger = false;
+            try {
+                finger = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+            } catch (err) { /* sehr alter Browser: bei der Mausfassung bleiben */ }
+            if (!finger) return;
+            document.getElementById('helpList').innerHTML =
+                '<dt>Wischen</dt><dd>Blickrichtung drehen</dd>' +
+                '<dt>Zwei Finger</dt><dd>Näher heran und weiter weg</dd>' +
+                '<dt>Ring am Boden</dt><dd>Antippen, um dorthin zu gehen</dd>' +
+                '<dt>Goldener Punkt</dt><dd>Zusatzinformation öffnen</dd>' +
+                '<dt>▶ unten links</dt><dd>Automatischen Rundgang starten und anhalten</dd>';
+        })();
 
         function openHelp() { help.classList.add('open'); }
         function closeHelp() {
