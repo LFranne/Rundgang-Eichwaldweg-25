@@ -1,0 +1,15 @@
+Eichwaldweg 25 — 360°-Rundgang, Fassung für die Veröffentlichung
+Erzeugt am 8.9.2026, 10:42:00 von veroeffentlichen.js
+
+DIESER ORDNER geht online, und nur dieser. Inhalt vollständig hochladen,
+die Ordnerstruktur beibehalten. index.html ist die Startseite.
+
+Die Panoramen sind die sparsam gespeicherten Web-Fassungen (JPEG 85,
+4:2:0, nicht progressiv) in unveraenderter Auflösung 5760x2880.
+Die Arbeitsfassungen liegen unter .codex\panoramas.
+
+Nicht von Hand bearbeiten — Änderungen gehören in die Arbeitsfassung
+unter .codex, danach dieses Skript erneut laufen lassen.
+
+Das Werkzeug zum Setzen von Ports und Infopoints ist hier abgeschaltet:
+der Knopf fehlt, das Fenster laesst sich nicht oeffnen.

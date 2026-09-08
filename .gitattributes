@@ -1,0 +1,4 @@
+# Keine Zeilenendenumwandlung. index.html wird von veroeffentlichen.js mit LF
+# geschrieben; würde git die Arbeitskopie auf CRLF umstellen, sähe jeder neue
+# Lauf wie eine Änderung aus, obwohl sich nichts geändert hat.
+* -text

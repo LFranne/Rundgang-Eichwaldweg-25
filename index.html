@@ -1,0 +1,3504 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>360° Rundgang – Eichwaldweg 25</title>
+    <!-- Markenschriften liegen lokal in ./fonts/, keine externe Abfrage -->
+    <link rel="stylesheet" href="./fonts/fonts.css">
+    <style>
+        /* =====================================================================
+           Markenfarben und Schriften nach Brand Guideline „Ab ins Grüne"
+           (Farbwelt S. 26, Typografie S. 27)
+           ===================================================================== */
+        :root {
+            --wald:     #253C28;   /* Leitfarbe Logo */
+            --wald2:    #4A613C;
+            --wald3:    #7C8E51;
+            --fichte:   #BBD034;   /* Akzent */
+            --graphite: #202829;   /* Leitfarbe Kernkommunikation */
+            --dust:     #F2EFED;
+            --gold:     #A17621;
+            --gold2:    #D4A12C;   /* Akzent, trägt gegen viel Grün */
+            --gold3:    #FFD962;
+
+            --font-head: 'Zilla Slab', Georgia, 'Times New Roman', serif;
+            --font-ui:   'Asap Condensed', 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body { font-family: var(--font-ui); background: var(--graphite); overflow: hidden; }
+
+        .viewer { position: relative; width: 100%; height: 100%; overflow: hidden; }
+
+        /* Zarte Abdunklung oben und unten, damit Schrift und Knöpfe
+           auch vor hellem Himmel oder heller Wand lesbar bleiben */
+        .scrim { position: absolute; left: 0; right: 0; z-index: 10; pointer-events: none; }
+        .scrim.top { top: 0; height: 132px; background: linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0)); }
+        .scrim.bottom { bottom: 0; height: 118px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.42)); }
+        /* Der Zeiger wird als Waldsignet gesetzt, siehe setLogoCursor() */
+        canvas { display: block; }
+
+        /* ===== KOPFZEILE oben links: Logo + Objekt ===== */
+        .brand { position: absolute; top: 26px; left: 30px; z-index: 30; pointer-events: none;
+                 text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .brand-row { display: flex; align-items: center; gap: 11px; }
+        .brand-mark { width: 33px; height: 28px; fill: var(--dust); }
+        .brand-name { color: var(--dust); font-family: var(--font-head); font-size: 22px; font-weight: 500; letter-spacing: 0.015em; }
+        .brand-sub { margin-top: 8px; color: var(--dust); font-size: 14px; font-weight: 400; line-height: 1.4; opacity: 0.9; letter-spacing: 0.01em; }
+
+        /* ===== KOMPASS oben rechts ===== */
+        .compass { position: absolute; top: 26px; right: 30px; width: 44px; height: 44px; z-index: 30;
+                   border-radius: 50%; background: rgba(32,40,41,0.58); backdrop-filter: blur(6px);
+                   display: flex; align-items: center; justify-content: center; }
+        .compass svg { width: 44px; height: 44px; }
+        .compass .needle { transform-origin: 22px 22px; }
+
+        /* ===== STEUERLEISTE unten links ===== */
+        .bar { position: absolute; bottom: 26px; left: 30px; z-index: 30; display: flex; align-items: center; gap: 13px; }
+        .bar-right { position: absolute; bottom: 26px; right: 30px; z-index: 30; display: flex; align-items: center; gap: 13px; }
+
+        .btn { width: 44px; height: 44px; border: none; border-radius: 50%; cursor: pointer;
+               background: rgba(32,40,41,0.58); backdrop-filter: blur(6px);
+               display: flex; align-items: center; justify-content: center;
+               transition: background 0.18s, transform 0.18s; }
+        .btn:hover { background: rgba(74,97,60,0.85); }        /* Wald2 */
+        .btn:active { transform: scale(0.94); }
+        .btn svg { width: 19px; height: 19px; fill: var(--dust); }
+        .btn.on { background: var(--dust); }
+        .btn.on svg { fill: var(--wald); }
+
+        /* Gruppe als Pille, wie in Matterport */
+        .pill { display: flex; align-items: center; border-radius: 26px; overflow: hidden;
+                background: rgba(32,40,41,0.58); backdrop-filter: blur(6px); }
+        .pill .btn { background: transparent; backdrop-filter: none; border-radius: 50%; }
+        .pill .btn:hover { background: rgba(187,208,52,0.22); }   /* Fichte, gedämpft */
+
+        .station { color: var(--dust); font-family: var(--font-head); font-size: 15px; font-weight: 500;
+                   margin-left: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.65); white-space: nowrap; }
+
+        /* Umschalter für Stationen mit mehreren Aufnahmen (z. B. Esstisch /
+           Billardtisch am selben Standpunkt) */
+        .variants { display: none; padding: 3px; }
+        .variants.show { display: flex; }
+        .variants button { border: none; background: transparent; color: rgba(242,239,237,0.72);
+                           font-family: inherit; font-size: 13.5px; padding: 7px 13px;
+                           border-radius: 20px; cursor: pointer; white-space: nowrap;
+                           transition: background 0.18s, color 0.18s; }
+        .variants button:hover { background: rgba(187,208,52,0.2); color: var(--dust); }
+        .variants button.sel { background: var(--dust); color: var(--wald); font-weight: 600; }
+
+        /* ===== HOVER-TEXTE =====
+           Die Anforderung nennt „Viele Symbole sind ohne Hover nicht
+           selbsterklärend" als Reibungspunkt. Eigene Blasen statt der
+           verzögerten Browser-Tooltips, damit die Erklärung sofort da ist. */
+        [data-tip] { position: relative; }
+        [data-tip]::after {
+            content: attr(data-tip); position: absolute; bottom: calc(100% + 9px); left: 50%;
+            transform: translateX(-50%); white-space: nowrap;
+            background: rgba(32,40,41,0.96); color: var(--dust); font-size: 13px;
+            font-family: var(--font-ui); padding: 5px 9px; border-radius: 5px;
+            opacity: 0; pointer-events: none; transition: opacity 0.12s 0.02s; z-index: 60;
+        }
+        [data-tip]:hover::after { opacity: 1; }
+        /* Hover-Texte der rechten Knöpfe würden sonst aus dem Bild laufen */
+        .bar-right [data-tip]::after { left: auto; right: 0; transform: none; }
+
+        /* ===== BEREICHSWAHL (Zahl im Symbol, wie der Ebenenstapel) ===== */
+        .stack { position: relative; }
+        .stack .num { position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+                      font-size: 10px; font-weight: 700; color: var(--wald);
+                      background: var(--dust); border-radius: 6px; padding: 0 3px; line-height: 1.25; }
+        .btn.on .stack .num { color: var(--dust); background: var(--wald); }
+
+        .areas { position: absolute; bottom: 82px; left: 30px; z-index: 40; min-width: 176px;
+                 border-radius: 12px; padding: 7px; background: rgba(32,40,41,0.95);
+                 backdrop-filter: blur(12px); box-shadow: 0 12px 34px rgba(0,0,0,0.5); display: none; }
+        .areas.open { display: block; }
+        .areas button { display: flex; width: 100%; justify-content: space-between; gap: 12px;
+                        border: none; background: transparent; color: var(--dust); font-size: 15px;
+                        padding: 9px 12px; border-radius: 7px; cursor: pointer; font-family: inherit; }
+        .areas button:hover { background: rgba(187,208,52,0.18); }
+        .areas button.current { background: rgba(187,208,52,0.28); font-weight: 600; }
+        .areas button i { font-style: normal; color: rgba(242,239,237,0.5); font-variant-numeric: tabular-nums; }
+
+        /* ===== GRUNDRISS =====
+           Matterport zeigt einen echten Grundriss aus seinem 3D-Modell. Hier
+           ist er aus dem Bauplan gezeichnet und die Standpunkte sind aus den
+           gemessenen Peilungen eingepasst — siehe STATUS.md. Er dient der
+           Orientierung, nicht der Vermessung. */
+        .plan { position: absolute; bottom: 82px; left: 30px; z-index: 41;
+                border-radius: 12px; padding: 12px 14px 10px;
+                background: rgba(242,239,237,0.96); backdrop-filter: blur(12px);
+                box-shadow: 0 12px 34px rgba(0,0,0,0.5); display: none; }
+        .plan.open { display: block; }
+        .plan h6 { font-family: var(--font-head); font-size: 14px; font-weight: 600;
+                   color: var(--wald); margin-bottom: 2px; }
+        .plan .wo { font-size: 11.5px; color: var(--wald2); margin-bottom: 8px; }
+        .plan svg { display: block; }
+        /* Wände als Masse, Räume als Fläche darin — so liest es sich als
+           Grundriss und nicht als Kästchenschema. Die Wand entsteht aus der
+           Differenz: dunkles Rechteck außen, helles innen. */
+        .plan .wand { fill: var(--graphite); }
+        .plan .raum { fill: #E4E0DC; }
+        .plan .aussen { fill: rgba(124,142,81,0.22); stroke: var(--wald2);
+                        stroke-width: 1.3; stroke-dasharray: 6 4; }
+        .plan .laibung { stroke: var(--graphite); stroke-width: 1.2; }
+        .plan .rname { font-size: 8.5px; fill: var(--wald2); }
+        /* Standpunkte: anklickbar, der aktuelle hervorgehoben */
+        .plan .pt { fill: var(--wald); stroke: var(--dust); stroke-width: 1.6; cursor: pointer; }
+        .plan .pt:hover { fill: var(--wald3); }
+        .plan .pt.hier { fill: var(--gold2); stroke: var(--wald); stroke-width: 2; }
+        /* Blickkegel am aktuellen Standpunkt */
+        .plan .kegel { fill: var(--gold2); opacity: 0.35; pointer-events: none; }
+
+        /* ===== PRÄSENTATIONSMODUS =====
+           Während der automatischen Tour tritt die Bedienung zurück, nur Pause
+           bleibt — so beschreibt es die Anforderung. */
+        .viewer.presenting .pill,
+        .viewer.presenting .bar-right,
+        .viewer.presenting .station,
+        .viewer.presenting .compass,
+        .viewer.presenting .brand-sub { opacity: 0; pointer-events: none; }
+        .pill, .bar-right, .station, .compass, .brand-sub { transition: opacity 0.4s; }
+
+        /* ===== BEDIENHILFE ===== */
+        .help { position: absolute; inset: 0; z-index: 55; display: none;
+                align-items: center; justify-content: center; background: rgba(20,26,26,0.72); }
+        .help.open { display: flex; }
+        .help-box { position: relative; width: min(430px, calc(100% - 56px)); border-radius: 12px;
+                    padding: 26px 28px; background: rgba(32,40,41,0.97); color: var(--dust);
+                    box-shadow: 0 18px 50px rgba(0,0,0,0.6); }
+        .help-box h3 { font-family: var(--font-head); font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+        .help-box dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 16px; font-size: 15px; }
+        .help-box dt { color: var(--fichte); white-space: nowrap; }
+        .help-box dd { color: rgba(242,239,237,0.82); }
+        .help-box .x { position: absolute; top: 16px; right: 16px; width: 30px; height: 30px;
+                       border: none; border-radius: 50%; background: rgba(242,239,237,0.12);
+                       cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .help-box .x svg { width: 15px; height: 15px; fill: var(--dust); }
+        .help-box .ok { width: 100%; margin-top: 20px; padding: 10px; border: none; border-radius: 7px;
+                        background: var(--fichte); color: var(--wald); font-family: inherit;
+                        font-size: 14px; font-weight: 700; cursor: pointer; }
+
+        /* ===== HINWEISBLASE (z. B. Link kopiert) ===== */
+        .toast { position: absolute; bottom: 96px; right: 30px; z-index: 50;
+                 background: rgba(32,40,41,0.96); color: var(--dust); font-size: 14px;
+                 padding: 10px 14px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+                 opacity: 0; transform: translateY(6px); pointer-events: none;
+                 transition: opacity 0.2s, transform 0.2s; }
+        .toast.show { opacity: 1; transform: none; }
+
+        /* ===== MENÜ ===== */
+        .panel { position: absolute; bottom: 82px; right: 30px; z-index: 40; min-width: 232px; max-height: 62vh;
+                 overflow-y: auto; border-radius: 12px; padding: 7px;
+                 background: rgba(32,40,41,0.95); backdrop-filter: blur(12px);
+                 box-shadow: 0 12px 34px rgba(0,0,0,0.5); display: none; }
+        .panel.open { display: block; }
+        .panel h4 { color: var(--fichte); font-size: 11px; font-weight: 600; letter-spacing: 0.13em;
+                    text-transform: uppercase; padding: 10px 12px 6px; }
+        .panel input.search { width: calc(100% - 12px); margin: 2px 6px 6px; padding: 8px 10px;
+                              border-radius: 7px; border: 1px solid rgba(242,239,237,0.2);
+                              background: rgba(0,0,0,0.25); color: var(--dust);
+                              font-family: inherit; font-size: 14px; }
+        .panel input.search:focus { outline: none; border-color: var(--fichte); }
+        .panel .none { padding: 8px 12px; font-size: 13.5px; color: rgba(242,239,237,0.5); }
+        /* Eigener Rollbereich, damit die Einträge darunter nicht aus dem
+           Menü rutschen und unerreichbar werden */
+        .panel #stationList { max-height: 34vh; overflow-y: auto; }
+        .panel button small { display: block; font-size: 12px; color: rgba(242,239,237,0.45);
+                              font-weight: 400; margin-top: 1px; }
+        .panel button { display: block; width: 100%; text-align: left; border: none; background: transparent;
+                        color: var(--dust); font-size: 15px; padding: 9px 12px; border-radius: 7px; cursor: pointer;
+                        font-family: inherit; }
+        .panel button:hover { background: rgba(187,208,52,0.18); }
+        .panel button.current { background: rgba(187,208,52,0.28); font-weight: 600; }
+
+        /* Gleichnamige Räume werden zu einer aufklappbaren Zeile zusammengefasst:
+           fünf Standpunkte im Wohnzimmer sind fünf Blickwinkel, nicht fünf Zimmer. */
+        .panel button.gruppe { display: flex; align-items: center; gap: 8px; }
+        .panel button.gruppe .pfeil { flex: none; width: 9px; height: 9px; fill: rgba(242,239,237,0.55);
+                                      transition: transform 0.15s; }
+        .panel button.gruppe.auf .pfeil { transform: rotate(90deg); }
+        .panel button.gruppe .txt { flex: 1; }
+        .panel button.gruppe .anz { flex: none; font-size: 12px; color: rgba(242,239,237,0.45);
+                                    font-variant-numeric: tabular-nums; }
+        .panel button.gruppe.enthaelt { background: rgba(187,208,52,0.14); }
+        .panel .blicke { display: none; }
+        .panel .blicke.auf { display: block; }
+        .panel .blicke button { padding-left: 30px; font-size: 14px; }
+        /* Der Punkt markiert einen Blickwinkel, nicht einen eigenen Raum */
+        .panel .blicke button::before { content: '·'; color: var(--gold2); margin-right: 8px; }
+
+        /* ===== WERKZEUG: Ports und Infopoints setzen ===== */
+        .tool { position: absolute; top: 88px; right: 30px; z-index: 40; width: 274px; border-radius: 12px;
+                padding: 16px; background: rgba(32,40,41,0.96); backdrop-filter: blur(12px);
+                color: var(--dust); font-size: 14px; box-shadow: 0 12px 34px rgba(0,0,0,0.5);
+                display: none; max-height: calc(100% - 176px); overflow-y: auto; }
+        .tool.open { display: block; }
+        .tool h5 { font-family: var(--font-head); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .tool .progress { font-size: 12.5px; color: rgba(242,239,237,0.55); margin-bottom: 12px;
+                          font-variant-numeric: tabular-nums; }
+        .tool .progress.done { color: var(--fichte); }
+
+        .tabs { display: flex; gap: 5px; background: rgba(0,0,0,0.28); border-radius: 8px; padding: 4px; margin-bottom: 13px; }
+        .tabs button { flex: 1; padding: 7px 4px; border: none; border-radius: 6px; background: transparent;
+                       color: rgba(242,239,237,0.68); font-family: inherit; font-size: 13.5px; cursor: pointer; }
+        .tabs button.sel { background: var(--wald2); color: var(--dust); font-weight: 600; }
+
+        .tool p.hint { margin-bottom: 12px; color: rgba(242,239,237,0.62); line-height: 1.5; font-size: 13px; }
+        .tool .read { background: rgba(0,0,0,0.28); border-radius: 8px; padding: 10px 12px;
+                      font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+        .tool .read div { display: flex; justify-content: space-between; padding: 2px 0; }
+        .tool .read span { color: rgba(242,239,237,0.55); }
+        .tool .read b { color: var(--fichte); font-weight: 600; }
+        .tool p.note { margin-top: 6px; font-size: 12px; line-height: 1.45;
+                       color: rgba(242,239,237,0.5); }
+
+        .tool label { display: block; margin-top: 11px; font-size: 12px; letter-spacing: 0.06em;
+                      text-transform: uppercase; color: rgba(242,239,237,0.5); }
+        .tool input, .tool textarea, .tool select {
+                      width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 7px;
+                      border: 1px solid rgba(242,239,237,0.2); background: rgba(0,0,0,0.25);
+                      color: var(--dust); font-family: inherit; font-size: 14px; }
+        .tool textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
+        /* Zeichenzähler unter dem Textfeld, wird gold, wenn es knapp wird */
+        .tool .zaehler { margin-top: 3px; font-size: 11.5px; text-align: right;
+                         color: rgba(242,239,237,0.4); font-variant-numeric: tabular-nums; }
+        .tool .zaehler.knapp { color: var(--gold3); }
+        .tool input:focus, .tool textarea:focus, .tool select:focus { outline: none; border-color: var(--fichte); }
+
+        .tool button.act { width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 7px;
+                           background: var(--fichte); color: var(--wald); font-weight: 700; font-size: 14px;
+                           cursor: pointer; font-family: inherit; letter-spacing: 0.02em; }
+        .tool button.act:disabled { background: rgba(242,239,237,0.16); color: rgba(242,239,237,0.4); cursor: default; }
+        .tool button.ghost { width: 100%; margin-top: 7px; padding: 9px; border: none; border-radius: 7px;
+                             background: rgba(242,239,237,0.13); color: var(--dust); font-size: 13.5px;
+                             cursor: pointer; font-family: inherit; }
+        .tool button.ghost.danger { background: rgba(212,161,44,0.24); color: var(--gold3); }
+        .tool button.ghost.danger:hover { background: rgba(212,161,44,0.42); }
+        .tool .basket { margin-top: 13px; padding-top: 12px; border-top: 1px solid rgba(242,239,237,0.15);
+                        font-size: 13px; color: rgba(242,239,237,0.62); }
+        .tool .basket b { color: var(--fichte); }
+        .tool .draft { margin-top: 5px; font-size: 12px; line-height: 1.4;
+                       color: rgba(242,239,237,0.5); }
+        .tool .draft.bad { color: var(--gold3); }
+
+        /* Liste der Ports bzw. Infopoints der aktuellen Station, mit Entfernen.
+           Beide Listen sehen gleich aus — sie tun dasselbe. */
+        #tPorts, #tTags { margin-top: 5px; }
+        #tPorts .leer, #tTags .leer { font-size: 13px; color: rgba(242,239,237,0.45); padding: 4px 0; }
+        #tPorts .prow, #tTags .prow { display: flex; align-items: center; justify-content: space-between;
+                        gap: 8px; padding: 5px 6px 5px 9px; border-radius: 6px; background: rgba(0,0,0,0.22);
+                        margin-bottom: 4px; font-size: 13.5px; }
+        #tPorts .prow.sel, #tTags .prow.sel { background: rgba(212,161,44,0.3); }
+        #tPorts .prow span, #tTags .prow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                             cursor: pointer; flex: 1; }
+        #tPorts .prow em, #tTags .prow em { font-style: normal; font-size: 11.5px; color: var(--gold2); margin-left: 7px; }
+        #tPorts .prow button, #tTags .prow button { flex: none; width: 22px; height: 22px; border: none; border-radius: 50%;
+                               background: rgba(242,239,237,0.12); cursor: pointer;
+                               display: flex; align-items: center; justify-content: center; padding: 0; }
+        #tPorts .prow button:hover, #tTags .prow button:hover { background: rgba(212,161,44,0.55); }
+        #tPorts .prow button svg, #tTags .prow button svg { width: 11px; height: 11px; fill: var(--dust); }
+
+        /* ===== INFOPOINTS =====
+           Anders als die Bodenports stehen Infopoints bildschirmparallel: sie sollen
+           von jeder Blickrichtung gleich gut lesbar sein. Position kommt pro Bild
+           aus ihrer Raumrichtung. */
+        .tag { position: absolute; z-index: 26; display: flex; flex-direction: column; align-items: center;
+               transform: translate(-50%, -100%) scale(var(--ts, 1)); transform-origin: bottom center;
+               cursor: pointer; transition: transform 0.15s; }
+        /* Gold2 als Akzent: trägt gegen die vielen Grüntöne der Aufnahmen
+           deutlich besser als Fichte, das im Laub untergeht. */
+        .tag .dot { width: 20px; height: 20px; border-radius: 50%; border: 4px solid var(--gold2);
+                    background: var(--dust); box-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .tag .stem { width: 1px; height: 15px; background: rgba(242,239,237,0.55); }
+        .tag:hover { --ts: 1.18; }
+        .tag.active .dot { background: var(--gold2); border-color: var(--dust); }
+        /* Der Punkt, der gerade im Werkzeug bearbeitet wird */
+        .tag.editing { --ts: 1.3; }
+        .tag.editing .dot { background: var(--dust); border-color: var(--fichte);
+                            box-shadow: 0 0 0 4px rgba(187,208,52,0.35), 0 1px 6px rgba(0,0,0,0.55); }
+
+        /* Hinweis über einem Ring, dessen Zielstation mehrere Aufnahmen vom
+           selben Standpunkt hat. Er nennt nur, was zur Wahl steht — die Wahl
+           selbst trifft man drüben an der Pille. Ohne Mausereignisse, damit er
+           den Ring darunter nicht blockiert. */
+        .porthint { position: absolute; z-index: 28; pointer-events: none;
+                    transform: translate(-50%, -100%);
+                    display: none; flex-direction: column; align-items: center; gap: 5px;
+                    padding: 9px 13px 10px; border-radius: 7px;
+                    background: rgba(242,239,237,0.94);
+                    box-shadow: 0 3px 14px rgba(20,28,20,0.45);
+                    font-family: var(--font-ui); white-space: nowrap;
+                    opacity: 0; transition: opacity 0.14s; }
+        .porthint.show { display: flex; opacity: 1; }
+        .porthint .kopf { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
+                          color: var(--wald2); }
+        .porthint .wahl { display: flex; gap: 5px; }
+        .porthint .wahl span { font-size: 13px; line-height: 1; padding: 4px 8px 5px;
+                               border-radius: 999px; color: var(--dust);
+                               background: var(--wald); }
+        /* Kleine Spitze zum Ring hinunter */
+        .porthint::after { content: ''; position: absolute; top: 100%; left: 50%;
+                           transform: translateX(-50%);
+                           border: 6px solid transparent;
+                           border-top-color: rgba(242,239,237,0.94); }
+
+        .tagcard { position: absolute; z-index: 45; width: 352px; max-width: calc(100% - 60px);
+                   border-radius: 7px; padding: 20px 24px 22px;
+                   background: rgba(32,40,41,0.96); backdrop-filter: blur(10px);
+                   box-shadow: 0 14px 40px rgba(0,0,0,0.55); color: var(--dust); display: none; }
+        .tagcard.open { display: block; }
+        /* Überschrift und Schließen in einer Zeile — so beginnt der Text weiter
+           oben und die Karte bleibt flach. Ohne Überschrift bleibt nur das ✕. */
+        .tagcard .tools { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
+        .tagcard .tools button { flex: none; background: none; border: none; cursor: pointer;
+                                 padding: 2px; margin-left: auto; }
+        .tagcard .tools svg { width: 17px; height: 17px; fill: rgba(242,239,237,0.7); }
+        .tagcard .tools button:hover svg { fill: var(--fichte); }
+        .tagcard h3 { flex: 1; font-family: var(--font-head); font-size: 18px; font-weight: 600;
+                      line-height: 1.3; }
+        .tagcard h3:empty { display: none; }
+        /* pre-line, damit Zeilenumbrüche im Infopoint-Text auch als Umbruch
+           erscheinen. Ohne das fasst HTML sie zu Leerzeichen zusammen und ein
+           mehrzeiliger Text läuft zu einem Absatz zusammen. */
+        /* Der Text wird immer vollständig gezeigt — kein „Mehr anzeigen" mehr.
+           Damit er passt, begrenzt das Werkzeug die Zeichenzahl (TEXT_MAX). */
+        .tagcard p { font-size: 15px; line-height: 1.55; color: rgba(242,239,237,0.78);
+                     white-space: pre-line; }
+        .tagcard p:empty { display: none; }
+        /* Weiterführender Link: als Knopf, damit er sich vom „Mehr anzeigen"
+           unterscheidet — das eine klappt Text auf, das andere verlässt die Tour. */
+        .tagcard .taglink { display: none; margin-top: 16px; font-size: 14px;
+                            padding: 8px 14px 9px; border-radius: 999px;
+                            background: var(--fichte); color: var(--graphite);
+                            text-decoration: none; font-weight: 600; }
+        .tagcard .taglink.show { display: inline-block; }
+        .tagcard .taglink:hover { background: var(--gold3); }
+
+        /* Zählung oben mittig, wie „2 of 53" in der Referenz */
+        .tagnav { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); z-index: 30;
+                  display: none; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 20px;
+                  background: rgba(32,40,41,0.58); backdrop-filter: blur(6px); }
+        .tagnav.show { display: flex; }
+        .tagnav span { color: var(--dust); font-size: 14px; min-width: 72px; text-align: center;
+                       font-variant-numeric: tabular-nums; }
+        .tagnav button { width: 28px; height: 28px; border: none; border-radius: 50%; background: none;
+                         cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .tagnav button:hover { background: rgba(187,208,52,0.22); }
+        .tagnav svg { width: 15px; height: 15px; fill: var(--dust); }
+
+        /* Bei schmalem Fenster rutscht die Zählung unter die Kopfzeile,
+           damit sie den Objektnamen nicht überdeckt */
+        @media (max-width: 800px) {
+            .tagnav { top: 74px; }
+        }
+
+        /* Bei schmalem Fenster würden linke und rechte Leiste überlappen.
+           Der Stationsname tritt dann zurück – er steht auch im Menü. */
+        @media (max-width: 900px) {
+            .station { display: none; }
+            .bar, .bar-right { bottom: 20px; }
+            .bar { left: 20px; }
+            .bar-right { right: 20px; }
+            .brand { top: 20px; left: 20px; }
+            .compass { top: 20px; right: 20px; }
+            /* Der Variantenumschalter passt neben den Knöpfen nicht mehr ins
+               Bild und rutscht deshalb eine Zeile höher. Die Bereichsliste
+               weicht ihm aus, damit sich beide nie überdecken. */
+            .variants.show { position: absolute; bottom: 76px; left: 0; }
+            .areas { left: 20px; bottom: 132px; }
+            .plan { left: 20px; bottom: 132px; }
+        }
+
+        /* ===== LADEANZEIGE ===== */
+        .spin { position: absolute; left: 50%; top: 50%; z-index: 25; width: 34px; height: 34px;
+                margin: -17px 0 0 -17px; border-radius: 50%; border: 2px solid rgba(242,239,237,0.2);
+                border-top-color: var(--fichte); animation: spin 0.8s linear infinite; display: none; }
+        .spin.show { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- AIG-Waldsignet, einmal definiert und per <use> referenziert -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="aig-wald" viewBox="0 0 122.46 103">
+            <path d="M122.36,63.4c.02-.09.04-.18.05-.27.02-.1.03-.2.03-.3,0-.04.01-.08.01-.12,0-.05-.01-.09-.01-.13,0-.1-.01-.2-.03-.3-.01-.09-.03-.18-.05-.27-.02-.09-.05-.17-.08-.26-.03-.09-.07-.18-.11-.26-.04-.08-.08-.16-.13-.23-.05-.08-.1-.16-.15-.23-.05-.07-.11-.14-.17-.21-.06-.07-.13-.13-.19-.2-.06-.06-.13-.11-.2-.17-.08-.06-.17-.12-.25-.17-.04-.02-.07-.05-.11-.07l-38.93-20.95c-.84-.45-1.85-.45-2.69,0l-21.84,11.75-12.26-43c5.07-1.52,10.43-2.35,15.99-2.35,25.68,0,47.88,17.4,53.97,42.31.37,1.52,1.9,2.45,3.43,2.08,1.52-.37,2.45-1.91,2.08-3.43C113.99,19.17,89.53,0,61.23,0c-7.04,0-13.8,1.21-20.1,3.41-.05.01-.1.01-.14.03-.02,0-.03.01-.05.02-.1.03-.2.07-.29.12-.02,0-.03.01-.05.02C16.96,12.08,0,34.71,0,61.23c0,8.52,1.72,16.77,5.1,24.51.12.28.25.55.37.83.01.03.03.05.04.07,0,.01,0,.03.02.04,5.06,9.91,15.47,16.31,26.5,16.31,3.71,0,7.33-.68,10.76-2.02.02,0,.04-.02.05-.02.01,0,.02,0,.04-.02,1.16-.46,2.3-.99,3.37-1.58l60.05-32.32c3.23-1.53,3.53-1.53,10.06-1.5.96,0,2.03,0,3.26,0,.04,0,.09-.01.13-.01.1,0,.2-.01.3-.03.09-.01.18-.03.26-.05.09-.02.17-.05.26-.08.09-.03.17-.07.26-.11.08-.04.16-.08.23-.13.08-.05.16-.1.23-.15.07-.05.14-.11.21-.17.07-.06.14-.13.2-.2.06-.06.11-.13.17-.2.06-.08.12-.17.17-.25.02-.04.05-.07.07-.11.02-.04.03-.07.05-.11.05-.09.08-.19.12-.29.03-.08.06-.17.08-.25ZM10.6,84.15c-.1-.23-.2-.45-.3-.68-3.07-7.02-4.63-14.51-4.63-22.24,0-22.12,13-41.26,31.76-50.19l-17.85,62.59s0,0,0,0c0,0,0,0,0,0,0,.02,0,.03,0,.05-.39,1.49.47,3.03,1.96,3.45,0,0,0,0,.01,0,9.01,2.55,15.65,10.15,17.09,19.27-2.13.61-4.34.92-6.6.92-8.91,0-17.32-5.17-21.43-13.18ZM103.81,61.95s-.08.04-.13.06l-59.08,31.8v-15.06c0-1.57-1.27-2.83-2.83-2.83s-2.83,1.27-2.83,2.83v4.03c-3.28-4.51-7.81-8.09-13.17-10.18l16-56.1,10.63,37.28-16.84,9.06c-1.38.74-1.89,2.46-1.15,3.84.51.95,1.49,1.49,2.5,1.49.45,0,.91-.11,1.34-.34l18.81-10.12s0,0,.01,0l23.63-12.71,28.21,15.18c-1.6.28-3.01.8-5.09,1.79Z"/>
+        </symbol>
+    </svg>
+
+    <div class="viewer" id="viewer">
+        <canvas id="canvas"></canvas>
+
+        <div class="scrim top"></div>
+        <div class="scrim bottom"></div>
+
+        <div class="spin" id="spin"></div>
+
+        <!-- Hinweis über einem Ring, dessen Ziel eine Auswahl mitbringt -->
+        <div class="porthint" id="portHint"></div>
+
+        <!-- Infopoints -->
+        <div id="tagLayer"></div>
+        <div class="tagcard" id="tagCard">
+            <!-- Kopfzeile: Überschrift und Schließen in einer Zeile. Der frühere
+                 Knopf „Link kopieren" ist entfernt — er erzeugte einen Anker
+                 (#Station/tag0), den die Tour nicht versteht, und landete
+                 deshalb auf der Station statt am Infopoint. Zum Teilen gibt es
+                 den Knopf in der Leiste unten. -->
+            <div class="tools">
+                <h3 id="tagTitle"></h3>
+                <button id="tagClose" title="Schließen">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
+                </button>
+            </div>
+            <p id="tagText"></p>
+            <!-- Weiterführender Link, nur sichtbar wenn der Infopoint einen hat.
+                 rel="noopener noreferrer", damit die geöffnete Seite keinen
+                 Zugriff auf das Fenster der Tour bekommt. -->
+            <a class="taglink" id="tagLink" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+
+        <div class="tagnav" id="tagNav">
+            <button id="tagPrev" title="Vorheriger Infopoint">
+                <svg viewBox="0 0 24 24"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z"/></svg>
+            </button>
+            <span id="tagCount">—</span>
+            <button id="tagNext" title="Nächster Infopoint">
+                <svg viewBox="0 0 24 24"><path d="M8.6 7.4 10 6l6 6-6 6-1.4-1.4 4.6-4.6z"/></svg>
+            </button>
+        </div>
+
+        <!-- Kopfzeile -->
+        <div class="brand">
+            <div class="brand-row">
+                <svg class="brand-mark"><use href="#aig-wald"/></svg>
+                <div class="brand-name">Eichwaldweg 25</div>
+            </div>
+            <div class="brand-sub">Präsentiert von Ab ins Grüne</div>
+        </div>
+
+        <!-- Kompass -->
+        <div class="compass" title="Blickrichtung">
+            <svg viewBox="0 0 44 44">
+                <text x="22" y="11" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-size="8" font-family="sans-serif">N</text>
+                <g class="needle" id="needle">
+                    <path d="M22 15 L25.4 27 L22 24.4 L18.6 27 Z" fill="#fff"
+                          stroke="rgba(0,0,0,0.45)" stroke-width="0.7"/>
+                </g>
+            </svg>
+        </div>
+
+        <!-- Steuerung unten links -->
+        <div class="bar">
+            <button class="btn" id="playBtn" data-tip="Abspielen">
+                <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="pill">
+                <button class="btn" id="areaBtn" data-tip="Bereich wählen">
+                    <span class="stack">
+                        <svg viewBox="0 0 24 24"><path d="M12 15.4 3.6 10.9 12 6.4l8.4 4.5-8.4 4.5zm0 2.3 7.3-3.9 1.1.6-8.4 4.5-8.4-4.5 1.1-.6 7.3 3.9z"/></svg>
+                        <i class="num" id="areaNum">1</i>
+                    </span>
+                </button>
+                <button class="btn" id="zoomOutBtn" data-tip="Herauszoomen">
+                    <svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>
+                </button>
+                <button class="btn" id="zoomInBtn" data-tip="Hineinzoomen">
+                    <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+                </button>
+                <button class="btn" id="resetBtn" data-tip="Ansicht zurücksetzen">
+                    <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>
+                </button>
+                <button class="btn" id="planBtn" data-tip="Grundriss">
+                    <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v6h5V5H5zm7 0v4h7V5h-7zm7 6h-7v8h7v-8zm-9 8v-6H5v6h5z"/></svg>
+                </button>
+            </div>
+            <div class="station" id="stationName">—</div>
+            <!-- erscheint nur bei Stationen mit mehreren Aufnahmen -->
+            <div class="pill variants" id="variantBar"></div>
+        </div>
+
+        <!-- Bereichsliste -->
+        <div class="areas" id="areaList"></div>
+
+        <!-- Grundriss der Wohnung -->
+        <div class="plan" id="planBox">
+            <h6>Ferienwohnung</h6>
+            <div class="wo" id="planWo">—</div>
+            <div id="planSvg"></div>
+        </div>
+
+        <!-- Steuerung unten rechts -->
+        <div class="bar-right">
+            <button class="btn" id="toolBtn" data-tip="Ports &amp; Infopoints setzen">
+                <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v2.06a7 7 0 0 1 5.94 5.94H21a1 1 0 0 1 0 2h-2.06A7 7 0 0 1 13 18.94V21a1 1 0 0 1-2 0v-2.06A7 7 0 0 1 5.06 13H3a1 1 0 0 1 0-2h2.06A7 7 0 0 1 11 5.06V3a1 1 0 0 1 1-1zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
+            </button>
+            <button class="btn" id="helpBtn" data-tip="Bedienhilfe">
+                <svg viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0-14c-2.2 0-4 1.8-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.2-1.8-4-4-4z"/></svg>
+            </button>
+            <button class="btn" id="shareBtn" data-tip="Diese Ansicht teilen">
+                <svg viewBox="0 0 24 24"><path d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7L16 7.1c.5.5 1.2.8 2 .8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7L8 9.8c-.5-.5-1.2-.8-2-.8-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 3 3 3s3-1.3 3-3-1.4-3-3-3z"/></svg>
+            </button>
+            <button class="btn" id="fullBtn" data-tip="Vollbild">
+                <svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z"/></svg>
+            </button>
+            <button class="btn" id="menuBtn" data-tip="Weitere Optionen">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+        </div>
+
+        <!-- Seitenmenü -->
+        <div class="panel" id="panel">
+            <h4>Suche</h4>
+            <input type="text" class="search" id="searchInput" placeholder="Station suchen …">
+            <h4>Stationen</h4>
+            <div id="stationList"></div>
+            <div id="summary"></div>
+        </div>
+
+        <!-- Bedienhilfe -->
+        <div class="help" id="help">
+            <div class="help-box">
+                <button class="x" id="helpClose" data-tip="Schließen">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
+                </button>
+                <h3>So bewegen Sie sich</h3>
+                <dl>
+                    <dt>Ziehen</dt><dd>Blickrichtung drehen</dd>
+                    <dt>Mausrad</dt><dd>Näher heran und weiter weg</dd>
+                    <dt>Ring am Boden</dt><dd>Dorthin gehen</dd>
+                    <dt>Goldener Punkt</dt><dd>Zusatzinformation öffnen</dd>
+                    <dt>Pfeiltasten</dt><dd>Blick drehen, mit Umschalt schneller</dd>
+                    <dt>Leertaste</dt><dd>Automatischen Rundgang starten und anhalten</dd>
+                </dl>
+                <button class="ok" id="helpOk">Verstanden</button>
+            </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <!-- Werkzeug: Ports und Infopoints setzen -->
+        <div class="tool" id="tool">
+            <h5>Setzen</h5>
+            <div class="progress" id="tProgress"></div>
+            <div class="tabs">
+                <button id="tabPort" class="sel">Port</button>
+                <button id="tabInfo">Infopoint</button>
+            </div>
+
+            <p class="hint" id="tHint">Umschauen geht weiter. Klick auf die Stelle am <em>Boden</em>, wo der Ring liegen soll.</p>
+
+            <div class="read">
+                <div><span>Station</span><b id="tStation">—</b></div>
+                <div id="tSurfaceRow"><span>Fläche</span><b id="tSurface">—</b></div>
+                <div><span>yaw</span><b id="tYaw">—</b></div>
+                <div><span>pitch</span><b id="tPitch">—</b></div>
+            </div>
+
+            <div id="tPortFields">
+                <label for="tTarget">Ziel-Station</label>
+                <select id="tTarget"></select>
+
+                <label for="tDist">Entfernung in Metern</label>
+                <input type="number" id="tDist" min="1" max="200" step="0.5" placeholder="z. B. 12">
+                <p class="note" id="tDistNote">
+                    Aus dem Blickwinkel geschätzt. Bei flachem Winkel ungenau —
+                    ruhig überschreiben, wenn du die Strecke besser kennst. Der Ring
+                    bleibt dabei genau an der geklickten Stelle, nur seine Größe ändert sich.
+                </p>
+
+                <label>Ports dieser Station</label>
+                <div id="tPorts"></div>
+            </div>
+
+            <div id="tInfoFields" style="display:none">
+                <label for="tTitle">Überschrift (optional)</label>
+                <input type="text" id="tTitle" maxlength="60" placeholder="leer lassen, wenn der Text genügt">
+                <label for="tText">Text</label>
+                <!-- Begrenzt, weil die Karte den Text vollständig zeigt: es gibt
+                     kein „Mehr anzeigen" mehr, das Überlänge auffangen würde. -->
+                <textarea id="tText" maxlength="400" placeholder="Beschreibung, die beim Klick erscheint"></textarea>
+                <div class="zaehler" id="tTextZahl">0 / 400</div>
+
+                <label for="tUrl">Link (optional)</label>
+                <input type="url" id="tUrl" placeholder="https://…">
+                <label for="tUrlText">Beschriftung des Links (optional)</label>
+                <input type="text" id="tUrlText" placeholder="z. B. Anleitung als PDF">
+                <p class="note">
+                    Öffnet sich in einem neuen Tab. Ohne Beschriftung steht
+                    „Mehr erfahren" auf dem Knopf.
+                </p>
+
+                <label>Infopoints dieser Station</label>
+                <div id="tTags"></div>
+            </div>
+
+            <button class="act" id="tAdd" disabled>Übernehmen</button>
+            <div id="tSelActions" style="display:none">
+                <button class="ghost danger" id="tDel">Ausgewählten Port löschen</button>
+                <button class="ghost" id="tUnsel">Auswahl aufheben</button>
+            </div>
+            <div id="tInfoActions" style="display:none">
+                <button class="ghost danger" id="tTagDel">Ausgewählten Infopoint löschen</button>
+                <button class="ghost" id="tTagUnsel">Auswahl aufheben</button>
+            </div>
+            <button class="ghost" id="tGo" style="display:none"></button>
+            <div class="basket">
+                Gesammelt: <b id="tCount">0</b>
+                <div class="draft" id="tDraft"></div>
+                <button class="ghost" id="tCopyAll">Alles kopieren</button>
+                <button class="ghost danger" id="tDiscard">Entwurf verwerfen</button>
+                <button class="ghost" id="tClose">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- three.js liegt lokal in ./lib/, damit die Tour ohne Internet läuft -->
+    <script src="./lib/three.min.js"></script>
+    <script>
+        // =====================================================================
+        //  STATIONEN
+        //  Node-ID = Bildname = GS-Nummer.  Ports als {nodeId, yaw, pitch}:
+        //  yaw  = Drehung um die Hochachse, 0° = Startblickrichtung des Bildes
+        //  pitch= Neigung, negativ = nach unten (Ports gehören auf den Boden)
+        //  Altformat {x, y} wird noch gelesen, siehe dirFromLegacyScreen().
+        // =====================================================================
+        // Bereiche statt Stockwerke: Matterport liest die Etage aus seinem
+        // 3D-Modell. Hier wird jede Station einem Bereich zugeordnet, das ergibt
+        // dieselbe Orientierungshilfe. Durchgehend deutsch benannt — die
+        // Anforderung nennt die halb englische Beschriftung „Floor 1" bei
+        // Matterport ausdrücklich als Reibungspunkt.
+        const areas = [
+            { id: 'aussen',   name: 'Außenbereich' },
+            { id: 'wohnung',  name: 'Wohnung' },
+            { id: 'terrasse', name: 'Terrasse' }
+        ];
+
+        const nodes = [
+            // Startstation. `view` ist der erste Eindruck: der Blick zeigt auf
+            // den Ring zur Einfahrt, der Weg hinein ist also sofort zu sehen.
+            // Gilt beim Laden, beim Sprung aus der Stationsliste und im
+            // automatischen Rundgang — siehe BLICKLOGIK, Regel 3.
+            { id: 'gs-0054', name: 'Parkplatz', area: 'aussen', img: './panoramas/gs-0054.jpg',
+              view: { yaw: 21.7, pitch: -16.0 },
+              links: [
+                { nodeId: 'gs-0055', yaw: 21.7, pitch: -16.0, dist: 7.9 }
+            ] },
+            { id: 'gs-0055', name: 'Einfahrt', area: 'aussen', img: './panoramas/gs-0055.jpg', links: [
+                { nodeId: 'gs-0054', yaw: 121.5, pitch: -11.7, dist: 7.9 },
+                { nodeId: 'gs-0056', yaw: -92.9, pitch: -6.3, dist: 14.6 }
+            ] },
+            // Blick die Treppe hinab: beide weiterführenden Ringe liegen mittig
+            // im Bild. Der steile Winkel ist gewollt — waagerecht sähe man hier
+            // nur Garagendach und Himmel.
+            { id: 'gs-0056', name: 'Hof / Garage', area: 'aussen', img: './panoramas/gs-0056.jpg',
+              view: { yaw: -140.0, pitch: -50.8 },
+              viewFrom: {
+                  'gs-0057': { yaw: 40.0, pitch: 6.5 }       // von der Treppe herauf
+              },
+              links: [
+                { nodeId: 'gs-0055', yaw: 42.3, pitch: -2.5, dist: 36.5 },
+                { nodeId: 'gs-0057', yaw: -147.4, pitch: -40.9, dist: 2.4 },
+                { nodeId: 'gs-0058', yaw: -126.6, pitch: -36.6, dist: 2.7 }
+            ] },
+            // Treppe von beiden Enden: von oben kommend geht der Blick hinab,
+            // vom Haus kommend hinauf. Genau dafür ist viewFrom gedacht.
+            { id: 'gs-0057', name: 'Treppe', area: 'aussen', img: './panoramas/gs-0057.jpg',
+              view: { yaw: -69.2, pitch: -41.5 },
+              viewFrom: {
+                  'gs-0058': { yaw: 69.8, pitch: 16.5 }      // vom Haus, treppauf
+              },
+              links: [
+                { nodeId: 'gs-0056', yaw: 68.5, pitch: 9.8, dist: 15.0 },
+                { nodeId: 'gs-0058', yaw: -69.2, pitch: -41.5, dist: 2.4 }
+            ] },
+            { id: 'gs-0058', name: 'Haus', area: 'aussen', img: './panoramas/gs-0058.jpg',
+              view: { yaw: -122.5, pitch: -4.6 },
+              viewFrom: {
+                  'gs-0059': { yaw: 2.3, pitch: 3.7 }        // aus der Wohnung
+              },
+              links: [
+                { nodeId: 'gs-0057', yaw: -7.4, pitch: -11.5, dist: 8.0 },
+                { nodeId: 'gs-0059', yaw: -122.5, pitch: -4.6, dist: 20.0 },
+                { nodeId: 'gs-0056', yaw: -95.6, pitch: 24.9, dist: 15.0 }
+            ] },
+            { id: 'gs-0059', name: 'Wohnung', area: 'wohnung', img: './panoramas/gs-0059.jpg', links: [
+                { nodeId: 'gs-0058', yaw: -27.5, pitch: 11.8, dist: 15.0 },
+                { nodeId: 'gs-0060', yaw: 109.7, pitch: -25.5, dist: 3.7 },
+                { nodeId: 'gs-0064', yaw: -176.4, pitch: 4.0, dist: 15.0 },
+                { nodeId: 'gs-0068', yaw: 94.5, pitch: -20.3, dist: 4.6 },
+                { nodeId: 'gs-0061', yaw: 130.9, pitch: -12.7, dist: 7.3 }
+            ] },
+            // gs-0060 ist der größte Knotenpunkt: von hier gehen sieben Wege ab
+            { id: 'gs-0060', name: 'Terrasse', area: 'terrasse', img: './panoramas/gs-0060.jpg', links: [
+                { nodeId: 'gs-0059', yaw: 88.2, pitch: -12.2, dist: 7.6 },
+                { nodeId: 'gs-0061', yaw: -44.7, pitch: -14.5, dist: 6.4 },
+                // { nodeId: 'gs-0062', yaw: -35.6, pitch: -18.1, dist: 5.1 },   // Terrasse 3 herausgenommen
+                { nodeId: 'gs-0064', yaw: 6.9, pitch: 1.8, dist: 15.0 },
+                { nodeId: 'gs-0068', yaw: -123.5, pitch: -33.2, dist: 2.9 },
+                { nodeId: 'gs-0072', yaw: -133.1, pitch: -17.0, dist: 5.5 },
+                { nodeId: 'gs-0058', yaw: 116.2, pitch: 12.2, dist: 15.0 },
+                { nodeId: 'gs-0069', yaw: -78.2, pitch: -21.1, dist: 4.4 },
+                { nodeId: 'gs-0082', yaw: -105.2, pitch: -8.1, dist: 11.4 }
+            ] },
+            { id: 'gs-0061', name: 'Terrasse 2', area: 'terrasse', img: './panoramas/gs-0061.jpg',
+              view: { yaw: -58.8, pitch: -6.7 },
+              viewFrom: {
+                  'gs-0063': { yaw: -150.3, pitch: 2.6 }     // von Terrasse 3
+              },
+              links: [
+                { nodeId: 'gs-0060', yaw: -143.9, pitch: -15.5, dist: 6.0 },
+                // { nodeId: 'gs-0062', yaw: -171.8, pitch: -40.1, dist: 2.5 },   // Terrasse 3 herausgenommen
+                { nodeId: 'gs-0058', yaw: -157.6, pitch: 5.1, dist: 15.0 },
+                { nodeId: 'gs-0064', yaw: 134.1, pitch: 1.7, dist: 15.0 },
+                { nodeId: 'gs-0063', yaw: -51.8, pitch: -20.9, dist: 4.5 }
+            ] },
+            // ---------------------------------------------------------------
+            // gs-0062, damals „Terrasse 3", am 07.09.2026 aus der Tour
+            // genommen. Grund: nur 2,6 m von Terrasse 2 entfernt (beidseitig
+            // gemessen 2,5 / 2,7) und bildlich das ähnlichste Paar des ganzen
+            // Satzes zu gs-0063 (49,8 von 255). Auf einer offenen Terrasse mit
+            // freier Sicht ist das ein redundanter Standpunkt; die drei übrigen
+            // Terrassen-Standpunkte decken die Fläche bereits ab.
+            //
+            // Geprüft vor dem Herausnehmen: nichts wird unerreichbar, und
+            // deriveNorth() liefert für alle übrigen Stationen exakt
+            // dieselben Nordoffsets. Verloren geht nur das unauffällige
+            // Prüfdreieck Terrasse · Terrasse 2 · Terrasse 3 (9,5°).
+            //
+            // ACHTUNG beim Zurückholen: Der Name „Terrasse 3" ist seit dem
+            // 07.09.2026 an gs-0063 vergeben (hieß vorher „Terrasse 4"). Diese
+            // Station braucht dann einen anderen Namen.
+            //
+            // Die acht Messungen bleiben hier stehen, damit die Station ohne
+            // neues Vermessen zurückkommen kann: diesen Block und die vier
+            // auskommentierten Ports weiter unten wieder aktivieren.
+            //
+            // { id: 'gs-0062', name: 'Terrasse 3', area: 'terrasse', img: './panoramas/gs-0062.jpg', links: [
+            //     { nodeId: 'gs-0060', yaw: -100.3, pitch: -18.8, dist: 5.0 },
+            //     { nodeId: 'gs-0061', yaw: 52.2, pitch: -36.0, dist: 2.7 },
+            //     { nodeId: 'gs-0058', yaw: -124.8, pitch: 6.5, dist: 15.0 },
+            //     { nodeId: 'gs-0064', yaw: 94.8, pitch: 4.1, dist: 15.0 }
+            // ] },
+            // ---------------------------------------------------------------
+            // Hieß bis zum 07.09.2026 „Terrasse 4". Umbenannt, weil die alte
+            // Terrasse 3 (gs-0062) aus der Tour genommen wurde und die Zählung
+            // sonst eine Lücke hätte.
+            { id: 'gs-0063', name: 'Terrasse 3', area: 'terrasse', img: './panoramas/gs-0063.jpg', links: [
+                { nodeId: 'gs-0061', yaw: -160.8, pitch: -23.3, dist: 4.0 },
+                { nodeId: 'gs-0064', yaw: -168.2, pitch: 5.0, dist: 15.0 },
+                // { nodeId: 'gs-0062', yaw: -136.5, pitch: -17.6, dist: 5.3 },   // Terrasse 3 herausgenommen
+                { nodeId: 'gs-0065', yaw: -1.9, pitch: -25.4, dist: 3.7 }
+            ] },
+            { id: 'gs-0064', name: 'Außenansicht', area: 'aussen', img: './panoramas/gs-0064.jpg', links: [
+                { nodeId: 'gs-0060', yaw: -74.5, pitch: -51.0, dist: 2.1 },
+                { nodeId: 'gs-0061', yaw: -3.3, pitch: -49.0, dist: 2.1 },
+                { nodeId: 'gs-0058', yaw: -104.7, pitch: -28.9, dist: 3.3 }
+            ] },
+            { id: 'gs-0065', name: 'Eingang', area: 'wohnung', img: './panoramas/gs-0065.jpg',
+              view: { yaw: 30.9, pitch: -5.4 },
+              viewFrom: {
+                  'gs-0068': { yaw: -55.0, pitch: -5.7 }     // aus dem Wohnzimmer
+              },
+              links: [
+                { nodeId: 'gs-0063', yaw: -62.1, pitch: -30.7, dist: 3.1 },
+                { nodeId: 'gs-0072', yaw: 34.3, pitch: -18.8, dist: 5.0 },
+                { nodeId: 'gs-0066', yaw: 36.6, pitch: -27.3, dist: 3.5 },
+                { nodeId: 'gs-0073', yaw: 30.4, pitch: -11.8, dist: 7.8 },
+                { nodeId: 'gs-0082', yaw: 7.8, pitch: -11.8, dist: 7.8 },
+                { nodeId: 'gs-0061', yaw: -51.3, pitch: -15.8, dist: 5.9 }
+            ] },
+            // Zwei Aufnahmen vom selben Standpunkt, die sich nur im Mobiliar
+            // unterscheiden. Deshalb eine Station mit umschaltbarem Bild: Ports
+            // und Nordausrichtung gelten für beide, nur die Textur wechselt.
+            // `img` ist die Voreinstellung und muss der ersten Variante entsprechen.
+            { id: 'gs-0066', name: 'Wohnzimmer 3', area: 'wohnung', img: './panoramas/gs-0066.jpg',
+              variants: [
+                  { name: 'Esstisch', img: './panoramas/gs-0066.jpg' },
+                  { name: 'Billard',  img: './panoramas/gs-0067.jpg' }
+              ],
+              view: { yaw: 134.2, pitch: -5.4 },
+              links: [
+                  { nodeId: 'gs-0065', yaw: 3.5, pitch: -25.4, dist: 3.7 },
+                  { nodeId: 'gs-0072', yaw: 163.4, pitch: -37.2, dist: 2.6 },
+                  { nodeId: 'gs-0068', yaw: 114.0, pitch: -23.3, dist: 4.0 },
+                  { nodeId: 'gs-0060', yaw: 106.9, pitch: -15.4, dist: 6.0 },
+                  { nodeId: 'gs-0082', yaw: 86.6, pitch: -20.1, dist: 4.6 },
+                  { nodeId: 'gs-0073', yaw: 158.0, pitch: -19.0, dist: 4.9 }
+              ] },
+            // Derselbe Wandeltisch von einem anderen Standpunkt, hier mit drei
+            // Auflagen. Stations-ID ist gs-0069, damit sie zur Voreinstellung
+            // passt — die weiteren Aufnahmen hängen als Varianten daran.
+            { id: 'gs-0069', name: 'Wohnzimmer 4', area: 'wohnung', img: './panoramas/gs-0069.jpg',
+              variants: [
+                  { name: 'Billard',      img: './panoramas/gs-0069.jpg' },
+                  { name: 'Esstisch',     img: './panoramas/gs-0070.jpg' },
+                  { name: 'Tischtennis',  img: './panoramas/gs-0071.jpg' }
+              ],
+              view: { yaw: -87.0, pitch: -18.2 },
+              links: [
+                  { nodeId: 'gs-0063', yaw: 18.0, pitch: -31.2, dist: 3.1 },
+                  { nodeId: 'gs-0068', yaw: -125.5, pitch: -27.7, dist: 3.4 },
+                  { nodeId: 'gs-0060', yaw: -156.3, pitch: -22.8, dist: 4.1 },
+                  // { nodeId: 'gs-0062', yaw: 118.1, pitch: -33.3, dist: 2.9 }   // Terrasse 3 herausgenommen
+                  // { nodeId: 'gs-0082', yaw: -82.4, pitch: -19.6, dist: 4.8 },  // am 07.09. wieder gelöscht
+                  { nodeId: 'gs-0073', yaw: -112.8, pitch: -13.9, dist: 6.6 }
+              ] },
+            { id: 'gs-0068', name: 'Wohnzimmer', area: 'wohnung', img: './panoramas/gs-0068.jpg',
+              viewFrom: {
+                  'gs-0072': { yaw: -176.5, pitch: -9.2 }    // aus Wohnzimmer 2
+              },
+              links: [
+                { nodeId: 'gs-0060', yaw: -3.6, pitch: -43.0, dist: 2.3 },
+                { nodeId: 'gs-0072', yaw: 158.5, pitch: -29.6, dist: 3.2 },
+                { nodeId: 'gs-0059', yaw: 27.8, pitch: -12.7, dist: 7.3 },
+                { nodeId: 'gs-0064', yaw: -67.5, pitch: 0.3, dist: 15.0 },
+                { nodeId: 'gs-0066', yaw: -179.9, pitch: -19.4, dist: 4.8 },
+                { nodeId: 'gs-0069', yaw: -95.8, pitch: -33.6, dist: 2.9 },
+                { nodeId: 'gs-0065', yaw: -149.8, pitch: -9.3, dist: 9.9 },
+                { nodeId: 'gs-0073', yaw: 114.4, pitch: -22.1, dist: 4.2 }
+            ] },
+            { id: 'gs-0072', name: 'Wohnzimmer 2', area: 'wohnung', img: './panoramas/gs-0072.jpg', links: [
+                { nodeId: 'gs-0060', yaw: 117.0, pitch: -17.4, dist: 5.3 },
+                { nodeId: 'gs-0068', yaw: 114.6, pitch: -28.8, dist: 3.3 },
+                { nodeId: 'gs-0064', yaw: 94.9, pitch: -2.7, dist: 34.4 },
+                { nodeId: 'gs-0066', yaw: 21.3, pitch: -38.2, dist: 2.6 },
+                { nodeId: 'gs-0073', yaw: -179.0, pitch: -27.5, dist: 3.5 },
+                { nodeId: 'gs-0082', yaw: 72.5, pitch: -17.4, dist: 5.4 },
+                { nodeId: 'gs-0065', yaw: 31.5, pitch: -13.9, dist: 6.6 }
+            ] },
+            { id: 'gs-0073', name: 'Küche', area: 'wohnung', img: './panoramas/gs-0073.jpg', links: [
+                { nodeId: 'gs-0072', yaw: 146.7, pitch: -28.6, dist: 3.3 },
+                { nodeId: 'gs-0066', yaw: 145.9, pitch: -18.4, dist: 5.1 },
+                { nodeId: 'gs-0065', yaw: 154.3, pitch: -9.7, dist: 9.5 },
+                { nodeId: 'gs-0074', yaw: -105.3, pitch: -41.3, dist: 2.4 },
+                { nodeId: 'gs-0075', yaw: -12.1, pitch: -31.5, dist: 3.1 },
+                { nodeId: 'gs-0081', yaw: -17.8, pitch: -10.1, dist: 9.1 },
+                { nodeId: 'gs-0082', yaw: 170.4, pitch: -9.9, dist: 9.3 }
+            ] },
+            { id: 'gs-0074', name: 'Küche 2', area: 'wohnung', img: './panoramas/gs-0074.jpg', links: [
+                { nodeId: 'gs-0073', yaw: 79.6, pitch: -43.4, dist: 2.3 }
+            ] },
+            // Verteiler im Schlafbereich: Türen zu Schlafzimmer und Bad
+            // Verteiler mit sechs Ringen, deshalb ein Blick je Herkunft.
+            //
+            // Der Standard ist die Wahlansicht: yaw -60 / pitch -20 zeigt vier
+            // der sechs Ringe (Küche, Wohnzimmer 2, Wohnzimmer 5, Badezimmer)
+            // und damit die größte Wahlfreiheit, die hier möglich ist. Die
+            // ganze Kugel wurde in 5°-Schritten abgesucht, mehr als vier gehen
+            // aus keiner Richtung: Küche (-98,3°) und Schlafzimmer (64,9°)
+            // liegen 163° auseinander, der waagerechte Öffnungswinkel beträgt
+            // aber nur etwa 124°. Beide Türen zugleich ist unmöglich.
+            //
+            // Der Blick liegt ungefähr auf die Spiegelwand, der Spiegel bleibt
+            // dabei aber am Bildrand — mittig wäre er ungünstig, weil dort die
+            // wegretuschierte Person saß.
+            //
+            // Die Schlafzimmerseite ist über viewFrom bedient.
+            { id: 'gs-0075', name: 'Durchgang', area: 'wohnung', img: './panoramas/gs-0075.jpg',
+              view: { yaw: -60.0, pitch: -20.0 },
+              viewFrom: {
+                  'gs-0081': { yaw: -100.4, pitch:  -7.3 },  // aus dem Schlafzimmer
+                  'gs-0077': { yaw:   99.9, pitch:  -6.7 }   // aus dem Badezimmer
+              },
+              links: [
+                { nodeId: 'gs-0073', yaw: -98.3, pitch: -30.6, dist: 3.1 },
+                { nodeId: 'gs-0072', yaw: -102.7, pitch: -15.4, dist: 6.0 },
+                { nodeId: 'gs-0077', yaw: -14.8, pitch: -47.8, dist: 2.2 },
+                { nodeId: 'gs-0081', yaw: 64.9, pitch: -21.1, dist: 4.4 },
+                { nodeId: 'gs-0079', yaw: 106.0, pitch: -45.6, dist: 2.2 },
+                { nodeId: 'gs-0082', yaw: -93.7, pitch: -5.5, dist: 16.7 }
+            ] },
+            { id: 'gs-0077', name: 'Badezimmer', area: 'wohnung', img: './panoramas/gs-0077.jpg',
+              view: { yaw: -174.0, pitch: -65.1 },
+              links: [
+                { nodeId: 'gs-0075', yaw: 81.9, pitch: -46.8, dist: 2.2 }
+            ] },
+            { id: 'gs-0079', name: 'Schlafzimmer 2', area: 'wohnung', img: './panoramas/gs-0079.jpg',
+              view: { yaw: -121.7, pitch: -1.7 },
+              links: [
+                { nodeId: 'gs-0080', yaw: -137.8, pitch: -24.4, dist: 3.9 },
+                { nodeId: 'gs-0081', yaw: -91.5, pitch: -22.1, dist: 4.2 },
+                { nodeId: 'gs-0075', yaw: 154.8, pitch: -36.9, dist: 2.7 }
+            ] },
+            { id: 'gs-0080', name: 'Schlafzimmer 3', area: 'wohnung', img: './panoramas/gs-0080.jpg',
+              view: { yaw: 113.7, pitch: -4.0 },
+              links: [
+                { nodeId: 'gs-0081', yaw: 83.0, pitch: -25.0, dist: 3.8 },
+                { nodeId: 'gs-0079', yaw: 136.3, pitch: -25.9, dist: 3.7 },
+                { nodeId: 'gs-0075', yaw: 158.2, pitch: -19.6, dist: 4.8 }
+            ] },
+            { id: 'gs-0081', name: 'Schlafzimmer', area: 'wohnung', img: './panoramas/gs-0081.jpg',
+              view: { yaw: 100.2, pitch: 0.7 },
+              links: [
+                { nodeId: 'gs-0075', yaw: 82.5, pitch: -17.5, dist: 5.3 },
+                { nodeId: 'gs-0073', yaw: 85.5, pitch: -12.1, dist: 7.6 },
+                { nodeId: 'gs-0079', yaw: 58.3, pitch: -22.3, dist: 4.2 },
+                { nodeId: 'gs-0080', yaw: 137.7, pitch: -22.5, dist: 4.2 }
+            ] },
+            { id: 'gs-0082', name: 'Wohnzimmer 5', area: 'wohnung', img: './panoramas/gs-0082.jpg', links: [
+                { nodeId: 'gs-0073', yaw: -139.0, pitch: -17.7, dist: 5.3 },
+                { nodeId: 'gs-0075', yaw: -142.4, pitch: -10.5, dist: 8.8 },
+                { nodeId: 'gs-0068', yaw: 175.0, pitch: -31.3, dist: 3.1 },
+                { nodeId: 'gs-0072', yaw: -108.1, pitch: -27.6, dist: 3.5 },
+                { nodeId: 'gs-0060', yaw: 153.4, pitch: -20.4, dist: 4.6 },
+                { nodeId: 'gs-0065', yaw: -7.5, pitch: -17.5, dist: 5.3 }
+            ] }
+        ];
+
+        // =====================================================================
+        //  INFOPOINTS
+        //  Wie die Ports über yaw/pitch verortet, aber NICHT auf den Boden
+        //  projiziert – sie dürfen auf Wandhöhe, an Geräten oder im Grünen sitzen.
+        //  Richtung mit dem Port-Werkzeug messen und hier eintragen.
+        //  Die beiden folgenden sind Platzhalter zum Ausprobieren.
+        // =====================================================================
+        const tags = [
+            // Mit dem Werkzeug (Menü ⋮ → Ports & Infopoints setzen, Reiter
+            // „Infopoint") messen, „Übernehmen", am Ende „Alles kopieren"
+            // und die Zeilen hier einfügen.
+            // Ohne Überschrift: Titel, Textanfang und Knopf hätten dasselbe
+            // dreimal gesagt. Die Karte zeigt hier nur Text und Knopf.
+            { nodeId: 'gs-0073', yaw: -130.4, pitch: -31.2,
+              title: '',
+              text: 'AB INS GRÜNE · GÄSTEINFO\nWaschtrockner\nKurzanleitung für Gäste\nDigital hilfreich. Schnell erklärt.',
+              link: { url: 'https://lfranne.github.io/Waschtrockner-Anleitung/waschtrockner_ab_ins_gruene.html',
+                      label: 'Anleitung Waschtrockner' } }
+        ];
+
+        const START_NODE = 'gs-0054';
+
+        // Wird an jede Bildadresse gehängt. Nach einer Retusche hochzählen –
+        // sonst zeigt der Browser weiter seine zwischengespeicherte Fassung,
+        // und ein retuschiertes Kennzeichen bliebe scheinbar lesbar.
+        const IMG_VERSION = 3;
+
+        // =====================================================================
+        //  WERKZEUGMODUS: örtlich bearbeiten, öffentlich nur ansehen
+        //
+        //  Ports und Infopoints setzt nur Franziska, und nur auf ihrem Rechner.
+        //  In der veröffentlichten Fassung soll ein Gast kein halbtechnisches
+        //  Bearbeitungsfenster vorfinden. Erkannt wird das an der Adresse:
+        //  localhost, 127.0.0.1, ::1 oder eine direkt geöffnete Datei gelten
+        //  als örtlich, alles andere als öffentlich. So gibt es nur **einen**
+        //  Dateistand, nichts umzuschalten und nichts zu vergessen.
+        //
+        //  Zum Ausprobieren lässt sich beides erzwingen:
+        //    ?werkzeug=0  Gastansicht, auch örtlich
+        //    ?werkzeug=1  Werkzeug, auch auf einer öffentlichen Adresse
+        //
+        //  Wichtig zur Einordnung: Das Werkzeug könnte online ohnehin keinen
+        //  Schaden anrichten. Es gibt keinen Server und keine Datenbank —
+        //  alles Gesetzte liegt im localStorage des jeweiligen Besuchers und
+        //  ist nach dem Verwerfen weg. Die Datei auf dem Server bleibt
+        //  unberührt, andere Besucher sehen nichts davon. Es geht um
+        //  Aufgeräumtheit, nicht um Sicherheit.
+        // =====================================================================
+        // In der veröffentlichten Fassung fest abgeschaltet (veroeffentlichen.js).
+        const WERKZEUG = false;
+
+        // =====================================================================
+        //  GRUNDRISS
+        //  Maße aus der Wohnflächenberechnung von 1984 (Wohnung 2, UG), die
+        //  Anordnung von Franziska in einer PowerPoint korrigiert, die Lage der
+        //  Standpunkte aus den gemessenen Peilungen eingepasst. Einheit Meter,
+        //  x nach Osten, y nach Süden, y = 0 ist die nördliche Außenwand.
+        //
+        //  Nicht von Hand pflegen: der Block wird von `grundriss.js` erzeugt
+        //  (`grundriss-block.js`) und hier eingesetzt. Rechenweg und Güte
+        //  stehen in STATUS.md unter „Lageplan der Standpunkte".
+        // =====================================================================
+        const GRUNDRISS = {
+            // Peilung im Grundriss = Peilung der Tour minus drehung
+            drehung: -117.82,
+            raeume: [
+                { name: 'Schlafzimmer', rects: [[0.000, 0.000, 4.010, 3.105]] },
+                { name: 'Bad', rects: [[4.010, 0.000, 1.720, 2.290]] },
+                { name: 'Flur', rects: [[4.010, 2.290, 1.720, 1.720]] },
+                { name: 'Küche', rects: [[5.730, 0.000, 2.260, 3.400]] },
+                { name: 'Abstellraum', rects: [[6.490, 3.400, 1.500, 1.500]] },
+                { name: 'Wohnzimmer', rects: [[7.990, 0.000, 5.135, 5.760]] },
+                { name: 'Eingang', rects: [[13.125, 3.910, 2.500, 1.850]] },
+                { name: 'Terrasse', aussen: true, rects: [[0.000, -2.000, 13.125, 2.000], [13.125, -2.000, 2.000, 5.910]] },
+            ],
+            // Türen: Ausschnitt in der Wand. Nicht von Hand gepflegt — abgeleitet
+            // aus den Ports der Tour und der Bedingung, dass die beiden Räume
+            // sich auch wirklich eine Wandstrecke teilen (siehe grundriss.js).
+            tueren: [
+                [9.958, -0.080, 1.200, 0.160],   // Terrasse – Wohnzimmer
+                [13.525, 3.830, 1.200, 0.160],   // Terrasse – Eingang
+                [13.045, 4.393, 0.160, 0.885],   // Eingang – Wohnzimmer
+                [7.910, 1.257, 0.160, 0.885],    // Küche – Wohnzimmer
+                [5.650, 2.410, 0.160, 0.870],    // Flur – Küche
+                [4.427, 2.210, 0.885, 0.160],    // Bad – Flur
+                [3.930, 2.410, 0.160, 0.575],    // Flur – Schlafzimmer
+            ],
+            punkte: {
+                'gs-0081': [0.59, 1.84],
+                'gs-0079': [3.13, 2.81],
+                'gs-0080': [2.66, 0.30],
+                'gs-0077': [4.69, 1.39],
+                'gs-0073': [7.14, 2.54],
+                'gs-0074': [7.22, 0.94],
+                'gs-0075': [4.61, 2.73],
+                'gs-0068': [10.38, 0.58],
+                'gs-0072': [9.86, 3.79],
+                'gs-0066': [10.94, 4.19],
+                'gs-0069': [12.82, 0.55],
+                'gs-0082': [11.92, 1.84],
+                'gs-0065': [14.64, 4.21],
+                'gs-0060': [10.07, -1.23],
+                'gs-0061': [14.33, -1.58],
+                'gs-0063': [14.81, 1.72],
+            }
+        };
+
+        // =====================================================================
+        //  NORDAUSRICHTUNG DER BILDER
+        //  Jedes Panorama hat eine eigene, willkürliche Nullrichtung – abhängig
+        //  davon, wie die Kamera beim Auslösen gedreht stand. yaw 30° zeigt also
+        //  in Bild A woandershin als in Bild B. Ohne Ausgleich springt der Blick
+        //  bei jedem Stationswechsel in eine andere Himmelsrichtung.
+        //
+        //  node.north gibt an, um wie viel Grad das Bild gegen die gemeinsame
+        //  Bezugsrichtung verdreht ist. Wahre Richtung = yaw + north.
+        //
+        //  Diese Werte müssen nicht von Hand gepflegt werden: Wenn ein Port
+        //  A→B und der Rückweg B→A beide gemessen sind, zeigen sie in der
+        //  Wirklichkeit genau entgegengesetzt. Daraus berechnet
+        //  deriveNorth() alle Werte selbst.
+        // =====================================================================
+        const norm180 = d => ((d + 180) % 360 + 360) % 360 - 180;
+
+        function measuredYaw(from, toId) {
+            const l = (from.links || []).find(x => x.nodeId === toId && typeof x.yaw === 'number');
+            return l ? l.yaw : null;
+        }
+
+        function deriveNorth() {
+            // Immer von vorne rechnen, damit der Aufruf nach jeder neuen Messung
+            // wiederholbar ist. Ein von Hand gesetztes northManual gewinnt.
+            nodes.forEach(n => {
+                n.north = (typeof n.northManual === 'number') ? n.northManual : null;
+            });
+            const start = nodes.find(n => n.id === START_NODE) || nodes[0];
+            if (start.north === null) start.north = 0;
+
+            // Breitensuche über alle Stationen mit beidseitig gemessenen Ports
+            const queue = [start];
+            while (queue.length) {
+                const a = queue.shift();
+                a.links.forEach(link => {
+                    const b = nodes.find(n => n.id === link.nodeId);
+                    if (!b || b.north !== null) return;
+                    const hin = measuredYaw(a, b.id);
+                    const zurueck = measuredYaw(b, a.id);
+                    if (hin === null || zurueck === null) return;
+                    // Hinweg und Rückweg sind gegenläufig:
+                    //   (hin + north_a) + 180 = (zurueck + north_b)
+                    b.north = norm180(hin + a.north + 180 - zurueck);
+                    queue.push(b);
+                });
+            }
+            // Nicht erreichbare Stationen bleiben unausgerichtet
+            nodes.forEach(n => { if (n.north === null) n.north = 0; });
+        }
+
+        // =====================================================================
+        //  MASSE DER SZENE
+        //  Kugelradius 100, 10 Einheiten pro Meter. Ein Ring mit Halbmaß 4.5 ist
+        //  damit rund 0,65 m breit – wie die Bodenringe bei Matterport.
+        //
+        //  EYE ist die Höhe der Kamera über dem Boden. Bis zum 07.09.2026 stand
+        //  hier 16 (= 1,60 m) als Annahme; Franziska hat die Stativhöhe mit
+        //  **etwa 1,50 m** angegeben. Der Wert wirkt nur dort, wo eine Entfernung
+        //  aus dem Blickwinkel gerechnet wird: `suggestDistance()` und
+        //  `floorPosition()`. Bereits gesetzte Ports tragen ihre Entfernung als
+        //  `dist` und bleiben unverändert liegen.
+        // =====================================================================
+        const SPHERE_R  = 100;
+        const EYE       = 15;
+        const RING_HALF = 4.5;      // sichtbarer Ring ist ca. 0,65 m breit
+        const PORT_OPACITY = 0.88;
+        const PORT_HOVER_SCALE = 1.16;
+
+        // Bis zu dieser Entfernung schrumpft der Ring perspektivisch wie ein
+        // echtes Objekt. Darüber wächst er mit, behält also seine Größe auf dem
+        // Bildschirm. Ohne das wäre ein Ring in 30 m nur noch 9 Pixel groß und
+        // damit praktisch unsichtbar — ein unsichtbarer Wegweiser ist nutzlos.
+        const RING_REF = 65;        // 6,5 m
+
+        function ringScale(dist) {
+            return dist > RING_REF ? dist / RING_REF : 1;
+        }
+        const BASE_FOV  = 75;
+        const FOV_MIN   = 32;
+        const FOV_MAX   = 100;
+        const LEGACY_ASPECT = 1536 / 774;   // Fenstermaß, als die alten x/y-Ports gemessen wurden
+        const DEG = Math.PI / 180;
+
+        // ===== THREE.JS =====
+        const canvas = document.getElementById('canvas');
+        const viewer = document.getElementById('viewer');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 400);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setClearColor(0x202829);        // Graphite
+        const tmpCam = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 400);
+
+        let viewW = 0, viewH = 0;
+
+        // renderer.setSize() schreibt eine feste Pixelbreite in den Canvas-Style.
+        // Die darf man nicht zurücklesen, sonst wächst der Canvas nie wieder mit –
+        // maßgeblich ist deshalb die Größe des Viewers.
+        function resizeView() {
+            viewW = viewer.clientWidth;
+            viewH = viewer.clientHeight;
+            camera.aspect = viewW / viewH;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewW, viewH);
+        }
+
+        let currentNodeId = null;
+        let yaw = 0, pitch = 0;
+        let sphere = null;
+        let traveling = false;
+        let toolOpen = false;
+        let lastReading = null;
+        let autoplay = null;
+
+        // =====================================================================
+        //  RICHTUNGEN
+        //  yaw 0 / pitch 0 zeigt entlang -Z. Das ist dieselbe Startblickrichtung
+        //  wie in der ersten Fassung der Tour, damit gesetzte Ports weiter passen.
+        // =====================================================================
+        function dirFromYawPitch(yawDeg, pitchDeg) {
+            const y = yawDeg * DEG, p = pitchDeg * DEG;
+            return new THREE.Vector3(
+                -Math.sin(y) * Math.cos(p),
+                 Math.sin(p),
+                -Math.cos(y) * Math.cos(p)
+            );
+        }
+
+        function yawPitchFromDir(v) {
+            const n = v.clone().normalize();
+            return {
+                yaw: Math.atan2(-n.x, -n.z) / DEG,
+                pitch: Math.asin(Math.max(-1, Math.min(1, n.y))) / DEG
+            };
+        }
+
+        // Bildschirmpunkt (0..1) -> Richtung, für die aktuelle Kamerastellung
+        function dirFromScreen(nx, ny) {
+            const v = new THREE.Vector3(nx * 2 - 1, -(ny * 2 - 1), 0.5).unproject(camera);
+            return v.sub(camera.position).normalize();
+        }
+
+        // Alte Ports {x, y}: das waren Bildschirmpositionen der früheren Kamera,
+        // die noch um den Mittelpunkt kreiste (Position 0,0,0.1, Blick auf 0,0,0).
+        // Genau diese Kamera wird hier nachgebaut.
+        function dirFromLegacyScreen(nx, ny) {
+            tmpCam.fov = BASE_FOV;
+            tmpCam.aspect = LEGACY_ASPECT;
+            tmpCam.updateProjectionMatrix();
+            tmpCam.position.set(0, 0, 0.1);
+            tmpCam.lookAt(0, 0, 0);
+            tmpCam.updateMatrixWorld();
+            return new THREE.Vector3(nx * 2 - 1, -(ny * 2 - 1), 0.5)
+                .unproject(tmpCam).sub(tmpCam.position).normalize();
+        }
+
+        function linkDirection(link) {
+            if (typeof link.yaw === 'number') return dirFromYawPitch(link.yaw, link.pitch || 0);
+            return dirFromLegacyScreen(link.x, link.y);
+        }
+
+        // =====================================================================
+        //  BLICKLOGIK
+        //  Wohin die Kamera schaut, wenn man an einer Station ankommt.
+        //
+        //  1. AUFRICHTEN. Ein Bodenring wird immer im Blick nach unten
+        //     angeklickt — typisch −20° bis −45°, bei nahen Ringen bis −48°.
+        //     Ohne Korrektur kommt man am neuen Standpunkt an und schaut auf
+        //     den Boden. Die Neigung fährt deshalb während des Übergangs auf
+        //     BLICK_NEIGUNG. Das ist die auffälligste Verbesserung: vorher
+        //     musste man nach jedem Schritt von Hand hochziehen.
+        //
+        //  2. RICHTUNG HALTEN, ABER NICHT SEITWÄRTS LAUFEN. Der Blick wird
+        //     geografisch fortgeführt (yaw + north bleibt gleich), damit die
+        //     Orientierung im Haus erhalten bleibt. Liegt die Laufrichtung
+        //     weiter als BLICK_TOTZONE neben der Blickmitte, dreht die Kamera
+        //     gerade so weit mit, dass die Laufrichtung am Rand der Totzone
+        //     liegt — man läuft also nie mehr quer zur eigenen Blickrichtung.
+        //     Innerhalb der Totzone bleibt der Blick unangetastet: man hat ja
+        //     angeklickt, was man ohnehin ansah.
+        //
+        //     Die Totzone ist der einzige Regler, den man drehen muss:
+        //       0   = immer strikt in Laufrichtung schauen (spielerisch)
+        //       22  = Voreinstellung, entspricht dem Verhalten von Matterport
+        //       180 = Blickrichtung nie verändern (nur aufrichten)
+        //
+        //  3. WUNSCHRICHTUNG — schlägt Regel 1 und 2. Bringt die Station ein
+        //     `view = { yaw, pitch }` mit, gilt genau das, bei jeder Ankunft.
+        //     Eine von Hand abgeschrittene Richtung weiß mehr als jede
+        //     Rechenregel: am Hof zeigt sie die Treppe hinab (pitch −50,8°),
+        //     wo ein waagerechter Blick nur Dach und Himmel zeigen würde.
+        //     Fehlt `pitch`, wird auf BLICK_NEIGUNG aufgerichtet; fehlt `yaw`,
+        //     bleibt die Richtung wie sie war.
+        //
+        //     `viewFrom = { '<Herkunfts-ID>': { yaw, pitch } }` verfeinert das
+        //     nach Herkunft und schlägt `view`. Nötig an Verteilern: im
+        //     Durchgang heißt „aus der Küche kommend" weiter in den
+        //     Schlafflügel, „aus dem Schlafzimmer kommend" zurück zum
+        //     Wohnbereich. Nicht genannte Herkünfte fallen auf `view` zurück,
+        //     und ohne beides übernehmen Regel 1 und 2.
+        //
+        //  Ein geteilter Link (`exakt`) übergeht alles: dort sind yaw und pitch
+        //  vom Absender vorgegeben und dürfen nicht verbogen werden.
+        // =====================================================================
+        const BLICK_TOTZONE = 22;    // Grad, siehe Regel 2
+        const BLICK_NEIGUNG = 0;     // Grad, Zielneigung beim Ankommen
+
+        function ankunftsBlick(node, von, towards, yawJetzt, pitchJetzt, exakt) {
+            if (exakt) return { yaw: yawJetzt, pitch: pitchJetzt };
+
+            // Regel 3 gewinnt gegen Regel 2: eine von Hand gesetzte
+            // Wunschrichtung ist eine bewusste Entscheidung und deshalb besser
+            // als jede Rechenregel. Sie gilt bei jeder Ankunft, auch beim
+            // Ringklick.
+            //
+            // `viewFrom` schlägt dabei `view`: an einem Verteiler hängt der
+            // sinnvolle Blick davon ab, woher man kommt. Aus der Küche in den
+            // Durchgang heißt „weiter in den Schlafflügel", aus dem
+            // Schlafzimmer heißt es „zurück zum Wohnbereich".
+            const wunsch = (von && node.viewFrom && node.viewFrom[von.id])
+                           || node.view;
+            if (wunsch) return {
+                yaw:   norm180(typeof wunsch.yaw === 'number'
+                               ? wunsch.yaw : yawJetzt),
+                pitch: typeof wunsch.pitch === 'number'
+                               ? wunsch.pitch : BLICK_NEIGUNG
+            };
+
+            let zielYaw = yawJetzt;
+
+            // Regel 2: Laufrichtung liegt im Bezugssystem der alten Station
+            // und wird wie der Blick auf die neue Station umgerechnet.
+            if (towards && von) {
+                const lauf = norm180(yawPitchFromDir(towards).yaw
+                                     + (von.north || 0) - (node.north || 0));
+                const ab = norm180(lauf - yawJetzt);
+                if (Math.abs(ab) > BLICK_TOTZONE)
+                    zielYaw = norm180(lauf - Math.sign(ab) * BLICK_TOTZONE);
+            }
+
+            return { yaw: zielYaw, pitch: BLICK_NEIGUNG };   // Regel 1
+        }
+
+        // =====================================================================
+        //  WO DER RING LIEGT
+        //  Ein Ring markiert die Stelle, an der das nächste Panorama aufgenommen
+        //  wurde. Diese Stelle kann weit weg sein und – bei ansteigendem Weg –
+        //  sogar über Augenhöhe liegen. Eine reine Bodenebene trifft sie dann nie.
+        //
+        //  Deshalb liegt der Ring auf dem Klickstrahl, in einer angebbaren
+        //  Entfernung. Auf dem Strahl erscheint er immer genau unter dem Klick,
+        //  unabhängig von der Entfernung – die bestimmt nur die scheinbare Größe.
+        //  Fehlt eine Angabe, wird der Schnittpunkt mit der Bodenebene benutzt.
+        // =====================================================================
+        function portPosition(link) {
+            const dir = linkDirection(link);
+            if (typeof link.dist === 'number' && link.dist > 0) {
+                return dir.clone().multiplyScalar(link.dist * 10);   // 10 Einheiten = 1 m
+            }
+            return floorPosition(dir);
+        }
+
+        // Vorbelegung für das Entfernungsfeld, in Metern
+        function suggestDistance(dir) {
+            const d = dir.clone().normalize();
+            if (d.y >= -FLOOR_MIN_Y) return 15;           // über dem Horizont: Vorschlag
+            return +Math.min(120, Math.max(1, EYE / -d.y / 10)).toFixed(1);
+        }
+
+        // =====================================================================
+        //  FLÄCHE UNTER DEM ZEIGER
+        //  Matterport kennt die echte Raumgeometrie aus seinem 3D-Modell. Hier
+        //  gibt es nur Fotos, also wird die Fläche aus dem Blickwinkel bestimmt:
+        //  deutlich nach unten = Boden, deutlich nach oben = Decke, dazwischen
+        //  eine senkrechte Fläche vor dem Betrachter. Für Boden und Decke ist das
+        //  geometrisch exakt, bei der Wand ist die Entfernung eine Annahme.
+        // =====================================================================
+        const CEIL_H    = 11;    // Decke über Augenhöhe (ca. 1,1 m)
+        const WALL_DIST = 42;    // angenommene Wandentfernung (ca. 4,2 m)
+        // Großzügig, damit der Ring auch bei flachem Winkel exakt im Blickstrahl
+        // bleibt. Eine engere Grenze würde ihn sichtbar nach vorne ziehen, also
+        // von der geklickten Stelle weg.
+        const FLOOR_MAX = 2000;  // 200 m
+        const FLOOR_MIN_Y = 0.006;   // ab ca. 0,35° unter dem Horizont gilt Boden
+        const WALK_MAX  = 58;    // höchstens 5,8 m vorfahren, bleibt gut in der Kugel
+
+        // Draußen reicht der Boden bis zum Horizont. Die Schwelle muss deshalb
+        // sehr flach liegen, sonst gilt ein Blick auf die Einfahrt in 20 m
+        // Entfernung schon als Wand — bei −1,1° liegt der Bodenpunkt 83 m weit.
+        function surfaceUnder(dir) {
+            const d = dir.clone().normalize();
+
+            if (d.y < -FLOOR_MIN_Y) {
+                const t = Math.max(8, Math.min(FLOOR_MAX, EYE / -d.y));
+                return { pos: d.multiplyScalar(t), normal: new THREE.Vector3(0, 1, 0),
+                         kind: 'Boden', dist: t };
+            }
+            if (d.y > 0.34) {
+                const t = Math.max(8, Math.min(120, CEIL_H / d.y));
+                return { pos: d.multiplyScalar(t), normal: new THREE.Vector3(0, -1, 0),
+                         kind: 'Decke', dist: t };
+            }
+            const normal = new THREE.Vector3(-d.x, 0, -d.z).normalize();
+            return { pos: d.multiplyScalar(WALL_DIST), normal: normal,
+                     kind: 'Horizont', dist: null };
+        }
+
+        // Richtung -> Punkt auf der Bodenebene (y = -EYE).
+        // Zu flache Richtungen würden die Ebene erst im Unendlichen treffen; sie
+        // werden auf ca. -8° gekippt und die Entfernung begrenzt.
+        // Der Ring muss dort landen, wo geklickt wurde – also am echten
+        // Schnittpunkt mit der Bodenebene, nicht an einer gekappten Entfernung.
+        // Eine zu enge Begrenzung hat den Ring vorher aus dem Blickstrahl
+        // heraus nach vorne gezogen.
+        function floorPosition(dir) {
+            const d = dir.clone().normalize();
+            if (d.y > -FLOOR_MIN_Y) { d.y = -FLOOR_MIN_Y; d.normalize(); }   // über dem Horizont
+            const t = Math.max(8, Math.min(FLOOR_MAX, EYE / -d.y));
+            return d.multiplyScalar(t);
+        }
+
+        // =====================================================================
+        //  BODENRING
+        //  Weicher Donut als Textur auf einer flach liegenden Fläche. Weil es ein
+        //  Objekt in der Szene ist, entsteht die perspektivische Ellipse von selbst.
+        // =====================================================================
+        //  `segmente` > 1 zerlegt das Band in so viele Bögen, wie die Zielstation
+        //  Aufnahmen zur Wahl stellt. Ohne ein Wort Text ist damit schon vor dem
+        //  Überfahren zu sehen, dass dieser Ring mehr kann als „dorthin gehen".
+        function ringTextureMit(segmente) {
+            const s = 512, c = document.createElement('canvas');
+            c.width = c.height = s;
+            const g = c.getContext('2d');
+            const mid = s / 2, r = s / 2;
+
+            // Ringband in Dust (#F2EFED), außen ein Hauch Schatten,
+            // damit der Ring auch auf hellem Boden lesbar bleibt.
+            const DUST = '242,239,237';
+            const grad = g.createRadialGradient(mid, mid, 0, mid, mid, r);
+            grad.addColorStop(0.00, 'rgba(' + DUST + ',0)');
+            grad.addColorStop(0.44, 'rgba(' + DUST + ',0)');
+            grad.addColorStop(0.52, 'rgba(' + DUST + ',0.32)');
+            grad.addColorStop(0.60, 'rgba(' + DUST + ',0.96)');
+            grad.addColorStop(0.68, 'rgba(' + DUST + ',0.96)');
+            grad.addColorStop(0.77, 'rgba(' + DUST + ',0.20)');
+            grad.addColorStop(0.84, 'rgba(37,60,40,0.20)');      // Wald als weicher Saum
+            grad.addColorStop(0.94, 'rgba(37,60,40,0)');
+            grad.addColorStop(1.00, 'rgba(37,60,40,0)');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, s, s);
+
+            // Lücken in das Band schneiden — nur beim Band, nicht bei Scheibe
+            // und Logo, die danach darüberkommen und die Schnitte im Inneren
+            // wieder auffüllen.
+            if (segmente > 1) {
+                const LUECKE = 0.30 * Math.PI * 2 / segmente;   // Anteil je Bogen
+                g.save();
+                g.globalCompositeOperation = 'destination-out';
+                for (let i = 0; i < segmente; i++) {
+                    const a = -Math.PI / 2 + i * Math.PI * 2 / segmente - LUECKE / 2;
+                    g.beginPath();
+                    g.arc(mid, mid, r * 0.99, a, a + LUECKE);
+                    g.arc(mid, mid, r * 0.40, a + LUECKE, a, true);
+                    g.closePath();
+                    g.fill();
+                }
+                g.restore();
+            }
+
+            // Gefüllte Dust-Scheibe im Inneren, damit das Waldgrün des Logos
+            // einen ruhigen Untergrund hat und auf jedem Boden lesbar bleibt
+            const disc = g.createRadialGradient(mid, mid, 0, mid, mid, r * 0.52);
+            disc.addColorStop(0.00, 'rgba(' + DUST + ',0.82)');
+            disc.addColorStop(0.72, 'rgba(' + DUST + ',0.78)');
+            disc.addColorStop(1.00, 'rgba(' + DUST + ',0.32)');
+            g.fillStyle = disc;
+            g.beginPath();
+            g.arc(mid, mid, r * 0.52, 0, Math.PI * 2);
+            g.fill();
+
+            // AIG-Waldsignet in die Ringmitte. Der Pfad wird aus dem <symbol> im
+            // Dokument gelesen, damit er nur an einer Stelle gepflegt werden muss.
+            const pathData = document.querySelector('#aig-wald path').getAttribute('d');
+            if (typeof Path2D === 'function' && pathData) {
+                const vbW = 122.46, vbH = 103;              // viewBox des Signets
+                const logoW = s * 0.30;                     // passt in das freie Innere
+                const k = logoW / vbW;
+                g.save();
+                g.translate(mid - logoW / 2, mid - (vbH * k) / 2);
+                g.scale(k, k);
+                g.fillStyle = '#253C28';                    // Wald
+                g.fill(new Path2D(pathData));
+                g.restore();
+            }
+
+            const t = new THREE.CanvasTexture(c);
+            t.minFilter = THREE.LinearMipmapLinearFilter;
+            t.magFilter = THREE.LinearFilter;
+            t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            return t;
+        }
+
+        // Je Segmentzahl nur eine Textur bauen – ein Ring kostet 512×512.
+        const ringTexturen = new Map();
+        function ringTextureFuer(segmente) {
+            const k = segmente > 1 ? segmente : 0;
+            if (!ringTexturen.has(k)) ringTexturen.set(k, ringTextureMit(k));
+            return ringTexturen.get(k);
+        }
+        const ringTexture = ringTextureFuer(0);
+
+        const ringGeometry = new THREE.PlaneGeometry(RING_HALF * 2, RING_HALF * 2);
+
+        // Legt die Fläche flach auf den Boden und dreht sie so um die Hochachse,
+        // dass die Oberkante des Logos vom Betrachter weg zeigt – dann liest man
+        // es richtig herum, wie eine Markierung auf der Straße.
+        // Ein flach liegender Ring wird bei streifendem Blick zu einem dünnen
+        // Strich – das Logo darin ist dann nicht mehr zu erkennen und die Fläche
+        // kaum zu treffen. Weit entfernte Ringe werden deshalb anteilig zum
+        // Betrachter gekippt: nahe Ringe liegen flach am Boden, ferne stellen
+        // sich auf. Der Kippanteil folgt dem Blickwinkel, unter dem der Ring
+        // vom Standpunkt aus zu sehen ist.
+        const TILT_FLAT   = 16;   // ab 16° unter dem Horizont bleibt er flach
+        const TILT_FULL   = 3;    // bei 3° ist die Kippung maximal
+        const TILT_MAX    = 0.72; // nie ganz aufgestellt, sonst wirkt er wie ein Schild
+
+        function portOrientation(pos) {
+            const n = pos.clone().normalize();
+            const abwaerts = Math.max(0, -Math.asin(Math.max(-1, Math.min(1, n.y))) * 180 / Math.PI);
+            const t = TILT_MAX * Math.min(1, Math.max(0,
+                          (TILT_FLAT - abwaerts) / (TILT_FLAT - TILT_FULL)));
+
+            const flach = new THREE.Vector3(0, 1, 0);
+            const zumBetrachter = n.clone().negate();
+            const normal = flach.clone().lerp(zumBetrachter, t).normalize();
+
+            // Oberkante des Logos zeigt vom Betrachter weg, damit es sich wie
+            // eine Markierung auf der Straße richtig herum liest
+            const weg = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+            const oben = weg.clone().sub(normal.clone().multiplyScalar(weg.dot(normal)));
+            if (oben.lengthSq() < 1e-6) oben.set(0, 0, -1);
+            oben.normalize();
+            const rechts = oben.clone().cross(normal).normalize();
+
+            const m = new THREE.Matrix4().makeBasis(rechts, oben, normal);
+            return new THREE.Quaternion().setFromRotationMatrix(m);
+        }
+        let ports = [];          // { mesh, nodeId, base }
+        let hoveredPort = null;
+
+        function clearPorts() {
+            ports.forEach(p => { if (p.mesh.parent) p.mesh.parent.remove(p.mesh); p.mesh.material.dispose(); });
+            ports = [];
+            hoveredPort = null;
+            if (typeof hidePortHint === 'function') hidePortHint();
+        }
+
+        // Baut die Ringe einer Station in die übergebene Bühne. Alles einer
+        // Station hängt in derselben Gruppe, damit sie beim Wechsel gemeinsam
+        // bewegt werden kann.
+        function makePorts(node) {
+            const liste = [];
+            node.links.forEach(link => {
+                // Führt der Ring zu einer Station mit mehreren Aufnahmen vom
+                // selben Standpunkt, bekommt er ein segmentiertes Band und beim
+                // Überfahren einen Hinweis mit den Namen der Auswahl.
+                const ziel = nodes.find(n => n.id === link.nodeId);
+                const varianten = (ziel && ziel.variants && ziel.variants.length > 1)
+                    ? ziel.variants.map(v => v.name) : null;
+
+                const mat = new THREE.MeshBasicMaterial({
+                    map: ringTextureFuer(varianten ? varianten.length : 0),
+                    transparent: true, opacity: PORT_OPACITY,
+                    depthWrite: false, side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(ringGeometry, mat);
+                const pos = portPosition(link);
+                mesh.position.copy(pos);
+                mesh.quaternion.copy(portOrientation(pos));
+                mesh.renderOrder = 2;
+                const dist = pos.length();
+                const baseScale = ringScale(dist);
+                mesh.scale.setScalar(baseScale);
+
+                // Nähere Ringe stehen klar da, weiter entfernte treten leicht
+                // zurück. Nur leicht: zusammen mit der perspektivischen
+                // Verkleinerung war ein ferner Ring vorher gar nicht mehr zu sehen.
+                const weit = Math.min(1, Math.max(0, (dist - 60) / 240));
+                liste.push({ mesh: mesh, nodeId: link.nodeId, baseScale: baseScale,
+                             base: PORT_OPACITY * (1 - 0.2 * weit),
+                             varianten: varianten });
+            });
+            return liste;
+        }
+
+        // Ringe der aktuellen Station neu aufbauen, z. B. nachdem im Werkzeug
+        // ein Port dazugekommen ist
+        function rebuildPorts(node) {
+            clearPorts();
+            ports = makePorts(node);
+            ports.forEach(p => (stage || scene).add(p.mesh));
+        }
+
+        // =====================================================================
+        //  ZEIGERRING
+        //  Liegt auf der erkannten Fläche und wird von der Perspektive verzerrt:
+        //  am Boden eine flache Ellipse, an der Wand ein aufrechter Kreis.
+        // =====================================================================
+        const reticleTexture = (function () {
+            const s = 256, c = document.createElement('canvas');
+            c.width = c.height = s;
+            const g = c.getContext('2d');
+            const mid = s / 2, R = s / 2;
+            const ring = (radius, width, color) => {
+                g.beginPath();
+                g.arc(mid, mid, radius * R, 0, Math.PI * 2);
+                g.lineWidth = width * R;
+                g.strokeStyle = color;
+                g.stroke();
+            };
+            ring(0.74, 0.30, 'rgba(37,60,40,0.16)');       // weicher Wald-Saum
+            ring(0.72, 0.19, 'rgba(242,239,237,0.62)');    // breites Band
+            ring(0.92, 0.035, 'rgba(242,239,237,0.92)');   // feine Außenlinie
+            const t = new THREE.CanvasTexture(c);
+            t.minFilter = THREE.LinearFilter;
+            return t;
+        })();
+
+        const reticle = new THREE.Mesh(
+            new THREE.PlaneGeometry(4.4, 4.4),
+            new THREE.MeshBasicMaterial({ map: reticleTexture, transparent: true,
+                                          opacity: 0.95, depthWrite: false, side: THREE.DoubleSide })
+        );
+        reticle.renderOrder = 3;
+        reticle.visible = false;
+        scene.add(reticle);
+
+        const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
+        const UP = new THREE.Vector3(0, 1, 0);
+
+        function updateReticle(e) {
+            if (!e || dragging || traveling) { reticle.visible = false; return; }
+
+            // Über einem Port rastet der Ring auf dessen Mitte ein
+            if (hoveredPort) {
+                // Weltposition, weil die Ringe in der Bühnengruppe hängen
+                hoveredPort.mesh.getWorldPosition(reticle.position);
+                reticle.quaternion.setFromUnitVectors(PLANE_NORMAL, UP);
+                reticle.scale.setScalar(reticle.position.distanceTo(camera.position) / WALL_DIST * 1.5);
+                reticle.material.opacity = 1;
+                reticle.visible = true;
+                showSurface('Port');
+                return;
+            }
+
+            const r = canvas.getBoundingClientRect();
+            const dir = dirFromScreen((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+            const s = surfaceUnder(dir);
+
+            reticle.position.copy(s.pos);
+            reticle.quaternion.setFromUnitVectors(PLANE_NORMAL, s.normal);
+            // mit der Entfernung mitskalieren, damit die Bildschirmgröße gleich bleibt
+            reticle.scale.setScalar(s.pos.length() / WALL_DIST);
+            reticle.material.opacity = 0.95;
+            reticle.visible = true;
+            showSurface(s.kind);
+        }
+
+        // Die Fläche ist nur beim Infopoint eine nützliche Angabe. Beim Port ist
+        // sie irreführend: dort zählt die Richtung, und die Entfernung wird als
+        // eigenes Feld gesetzt.
+        function showSurface(kind) {
+            const flaeche = document.getElementById('tSurface');
+            if (flaeche) flaeche.textContent = kind;
+        }
+
+        // =====================================================================
+        //  HINWEIS AUF EINE AUSWAHL
+        //  Ein Ring, dessen Zielstation mehrere Aufnahmen vom selben Standpunkt
+        //  hat, verspricht mehr als „dorthin gehen": drüben lässt sich das
+        //  Mobiliar umschalten. Das segmentierte Band zeigt, DASS es eine Wahl
+        //  gibt; dieser Hinweis nennt beim Überfahren, WELCHE.
+        // =====================================================================
+        const portHint = document.getElementById('portHint');
+
+        function hidePortHint() { portHint.classList.remove('show'); }
+
+        function showPortHint(p) {
+            if (!p || !p.varianten) { portHint.classList.remove('show'); return; }
+            portHint.innerHTML =
+                '<div class="kopf">Zur Wahl</div><div class="wahl">' +
+                p.varianten.map(n => '<span></span>').join('') + '</div>';
+            // Namen als Text setzen, nicht in HTML einbauen – sie stammen aus
+            // den Stationsdaten und könnten Zeichen enthalten, die HTML deuten.
+            const felder = portHint.querySelectorAll('.wahl span');
+            p.varianten.forEach((n, i) => { if (felder[i]) felder[i].textContent = n; });
+            portHint.classList.add('show');
+            positionPortHint();
+        }
+
+        // Der Hinweis hängt am Ring, nicht am Mauszeiger: beim Umschauen und
+        // Zoomen wandert er mit, ohne dass die Maus bewegt werden muss.
+        function positionPortHint() {
+            if (!portHint.classList.contains('show') || !hoveredPort) return;
+            const welt = hoveredPort.mesh.getWorldPosition(new THREE.Vector3());
+            if (welt.clone().sub(camera.position).dot(dirFromYawPitch(yaw, pitch)) <= 0) {
+                portHint.classList.remove('show');
+                return;
+            }
+            const p = welt.clone().project(camera);
+
+            // Der Ring soll frei bleiben, der Hinweis also oberhalb sitzen.
+            // Sein Radius steht in Welteinheiten und lässt sich nicht mit
+            // Pixeln verrechnen — deshalb wird ein Punkt am Ringrand mit
+            // projiziert und der Abstand am Bildschirm gemessen.
+            const rechts = new THREE.Vector3()
+                .setFromMatrixColumn(camera.matrixWorld, 0)
+                .multiplyScalar(hoveredPort.mesh.scale.x * RING_HALF);
+            const rand = welt.clone().add(rechts).project(camera);
+            const radiusPx = Math.abs(rand.x - p.x) * 0.5 * viewW;
+
+            portHint.style.left = ((p.x * 0.5 + 0.5) * viewW) + 'px';
+            portHint.style.top  = Math.max(52,
+                (-p.y * 0.5 + 0.5) * viewH - radiusPx - 8) + 'px';
+        }
+
+        // =====================================================================
+        //  INFOPOINTS: aufbauen, pro Bild positionieren, Karte öffnen
+        // =====================================================================
+        const tagLayer = document.getElementById('tagLayer');
+        const tagCard = document.getElementById('tagCard');
+        const tagNav = document.getElementById('tagNav');
+        let tagEls = [];         // { el, dir, index }
+        let openTag = null;      // Index in tags
+
+        // Ein Infopoint ist nur sichtbar, während man an seiner Station steht.
+        // Dieselbe Sache kann aber von mehreren Standpunkten aus zu sehen sein —
+        // die Waschtrockner etwa aus der Küche und aus Küche 2. Die Richtung ist
+        // von jedem Standpunkt eine andere und muss dort gemessen werden; der
+        // Inhalt soll deswegen aber nicht zweimal geschrieben werden. Also:
+        // ein Infopoint, mehrere Platzierungen.
+        //
+        //   { nodeId: 'gs-0073', yaw: …, pitch: …, title, text }   Kurzform
+        //   { at: [ { nodeId: 'gs-0073', yaw: …, pitch: … },       mehrere
+        //           { nodeId: 'gs-0074', yaw: …, pitch: … } ], title, text }
+        //
+        // Warum die Richtung nicht gerechnet werden kann: Dafür bräuchte man die
+        // Positionen der Stationen zueinander. Bekannt sind nur Peilungen und
+        // grobe Entfernungen — die widersprechen sich teils um Faktor zwei.
+        function tagPlacements(tag) {
+            if (Array.isArray(tag.at) && tag.at.length) return tag.at;
+            return [{ nodeId: tag.nodeId, yaw: tag.yaw, pitch: tag.pitch }];
+        }
+
+        function buildTags(node) {
+            tagLayer.innerHTML = '';
+            tagEls = [];
+            tags.forEach((tag, index) => {
+              tagPlacements(tag).forEach(ort => {
+                if (ort.nodeId !== node.id) return;
+                const el = document.createElement('div');
+                el.className = 'tag';
+                el.innerHTML = '<div class="dot"></div><div class="stem"></div>';
+                el.title = tagLabel(tag);
+                el.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    // Bei offenem Werkzeug im Infopoint-Modus greift der Klick
+                    // zum Bearbeiten, nicht zum Lesen — so wie ein Klick auf
+                    // einen Ring dort den Port auswählt.
+                    if (toolOpen && toolMode === 'info') { selectTag(index); return; }
+                    // Sonst: zweiter Klick auf denselben Punkt schließt wieder
+                    if (openTag === index) closeTag(); else showTag(index);
+                });
+                tagLayer.appendChild(el);
+                tagEls.push({ el: el, dir: dirFromYawPitch(ort.yaw, ort.pitch), index: index });
+              });
+            });
+            tagNav.classList.toggle('show', tags.length > 0);
+            updateTagCount();
+            // Nach jedem Neuaufbau die Hervorhebung des bearbeiteten Punktes
+            // wiederherstellen — die alten Elemente sind weg.
+            if (typeof markTagSelection === 'function') markTagSelection();
+        }
+
+        function positionTags() {
+            const forward = dirFromYawPitch(yaw, pitch);
+            tagEls.forEach(t => {
+                if (t.dir.dot(forward) <= 0.02) { t.el.style.display = 'none'; return; }
+                const p = t.dir.clone().multiplyScalar(50).project(camera);
+                const sx = (p.x * 0.5 + 0.5) * viewW;
+                const sy = (-p.y * 0.5 + 0.5) * viewH;
+                if (sx < -40 || sx > viewW + 40 || sy < -40 || sy > viewH + 40) { t.el.style.display = 'none'; return; }
+                t.el.style.display = 'flex';
+                t.el.style.left = sx + 'px';
+                t.el.style.top = sy + 'px';
+                t.el.classList.toggle('active', t.index === openTag);
+            });
+            if (openTag !== null) placeCard();
+        }
+
+        // Karte neben den Punkt legen, aber im Bild halten
+        function placeCard() {
+            const t = tagEls.find(x => x.index === openTag);
+            if (!t || t.el.style.display === 'none') return;
+            const w = tagCard.offsetWidth, h = tagCard.offsetHeight;
+            const ax = parseFloat(t.el.style.left), ay = parseFloat(t.el.style.top);
+            let x = ax - w * 0.5, y = ay + 22;
+            if (y + h > viewH - 96) y = ay - h - 34;          // sonst unter die Leiste rutschen
+            x = Math.max(18, Math.min(viewW - w - 18, x));
+            y = Math.max(18, Math.min(viewH - h - 18, y));
+            tagCard.style.left = x + 'px';
+            tagCard.style.top = y + 'px';
+        }
+
+        function updateTagCount() {
+            document.getElementById('tagCount').textContent =
+                tags.length ? ((openTag === null ? 0 : openTag + 1) + ' von ' + tags.length) : '—';
+        }
+
+        function showTag(index) {
+            const tag = tags[index];
+            if (!tag) return;
+            openTag = index;
+            // Überschrift ist freiwillig. Ist keine gesetzt, bleibt die
+            // Kopfzeile nur das ✕ und der Text beginnt ganz oben.
+            document.getElementById('tagTitle').textContent = tag.title || '';
+            document.getElementById('tagText').textContent = tag.text || '';
+
+            // Weiterführender Link, falls einer hinterlegt ist. Nur http(s)
+            // zulassen: ein javascript:-Ziel im Datensatz würde beim Klick
+            // Code in der Tour ausführen.
+            const a = document.getElementById('tagLink');
+            const url = tag.link && typeof tag.link.url === 'string' ? tag.link.url.trim() : '';
+            const erlaubt = /^https?:\/\//i.test(url);
+            if (erlaubt) {
+                a.href = url;
+                a.textContent = (tag.link.label || '').trim() || 'Mehr erfahren';
+                a.classList.add('show');
+            } else {
+                a.removeAttribute('href');
+                a.classList.remove('show');
+            }
+
+            tagCard.classList.add('open');
+            updateTagCount();
+            placeCard();
+        }
+
+        function closeTag() {
+            openTag = null;
+            tagCard.classList.remove('open');
+            tagEls.forEach(t => t.el.classList.remove('active'));
+            updateTagCount();
+        }
+
+        // Blick weich auf eine Richtung schwenken
+        function turnTo(targetYaw, targetPitch) {
+            let dy = ((targetYaw - yaw + 540) % 360) - 180;      // kürzester Weg
+            const y0 = yaw, p0 = pitch;
+            return tween(520, k => {
+                const e = easeInOut(k);
+                yaw = y0 + dy * e;
+                pitch = p0 + (targetPitch - p0) * e;
+            });
+        }
+
+        async function stepTag(delta) {
+            if (!tags.length) return;
+            const from = openTag === null ? -1 : openTag;
+            const next = (from + delta + tags.length) % tags.length;
+            const tag = tags[next];
+            // Bei mehreren Platzierungen die des aktuellen Standpunkts nehmen –
+            // dann bleibt man stehen, statt für denselben Punkt umzuziehen.
+            const orte = tagPlacements(tag);
+            const ort = orte.find(o => o.nodeId === currentNodeId) || orte[0];
+            closeTag();
+            if (ort.nodeId !== currentNodeId) {
+                await goToNode(ort.nodeId);
+            }
+            await turnTo(ort.yaw, ort.pitch);
+            showTag(next);
+        }
+
+        document.getElementById('tagClose').addEventListener('click', closeTag);
+        document.getElementById('tagPrev').addEventListener('click', () => stepTag(-1));
+        document.getElementById('tagNext').addEventListener('click', () => stepTag(1));
+
+        // =====================================================================
+        //  TEXTUREN mit kleinem Zwischenspeicher
+        //  Ein Panorama belegt als Textur gut 50 MB Grafikspeicher, deshalb werden
+        //  nur die letzten paar behalten und ältere freigegeben.
+        // =====================================================================
+        const CACHE_MAX = 5;
+        const cache = new Map();
+        const loader = new THREE.TextureLoader();
+
+        function loadTexture(pfad) {
+            // Version anhängen, damit ein überarbeitetes Bild wirklich neu
+            // geladen wird. Der Zwischenspeicher wird nach dem Pfad geführt,
+            // also inklusive Version – ein Bild wird trotzdem nur einmal geholt.
+            const url = pfad + (pfad.indexOf('?') < 0 ? '?v=' : '&v=') + IMG_VERSION;
+            if (cache.has(url)) {
+                const t = cache.get(url);
+                cache.delete(url); cache.set(url, t);      // als jüngste markieren
+                return Promise.resolve(t);
+            }
+            return new Promise((resolve, reject) => {
+                loader.load(url, tex => {
+                    tex.minFilter = THREE.LinearFilter;
+                    cache.set(url, tex);
+                    while (cache.size > CACHE_MAX) {
+                        const oldestKey = cache.keys().next().value;
+                        cache.get(oldestKey).dispose();
+                        cache.delete(oldestKey);
+                    }
+                    resolve(tex);
+                }, undefined, reject);
+            });
+        }
+
+        // Kugeln zeichnen ohne Tiefentest in Reihenfolge ihrer renderOrder.
+        // So liegt beim Überblenden die neue immer über der alten, und Ringe
+        // sowie Zeigerring (renderOrder 2 und 3) bleiben darüber sichtbar.
+        let sphereOrder = -100;
+
+        function makeSphere(texture) {
+            const geo = new THREE.SphereGeometry(SPHERE_R, 64, 40);
+            geo.scale(-1, 1, 1);                            // von innen sichtbar
+            const mat = new THREE.MeshBasicMaterial({
+                map: texture, transparent: true, opacity: 1,
+                depthTest: false, depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.renderOrder = ++sphereOrder;
+            return mesh;
+        }
+
+
+        // =====================================================================
+        //  STATIONSWECHSEL
+        //  Beim Klick auf einen Ring fährt die Kamera ein Stück in dessen Richtung,
+        //  dann wird das neue Panorama eingeblendet. Die Blickrichtung bleibt
+        //  erhalten, damit man die Orientierung nicht verliert.
+        // =====================================================================
+        const spin = document.getElementById('spin');
+        const easeInOut = t => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+
+        function tween(ms, step) {
+            return new Promise(resolve => {
+                const t0 = performance.now();
+                // In einem verborgenen Tab feuert requestAnimationFrame nicht.
+                // Da an diesen Übergängen der Stationswechsel hängt, braucht es
+                // einen Ausweichpfad – sonst bleibt die Tour in der Ladeanzeige
+                // stehen, wenn man während des Ladens den Tab wechselt.
+                const next = fn => {
+                    if (document.hidden) setTimeout(() => fn(performance.now()), 16);
+                    else requestAnimationFrame(fn);
+                };
+                (function frame(now) {
+                    const k = Math.min(1, (now - t0) / ms);
+                    step(k);
+                    if (k < 1) next(frame); else resolve();
+                })(t0);
+            });
+        }
+
+        // Jede Station lebt in einer eigenen Gruppe: Panorama und Ringe zusammen.
+        // Beim Wechsel wird die neue Gruppe an den Zielpunkt gesetzt und die
+        // Kamera dorthin gefahren, während überblendet wird. Am Ende sind Kamera
+        // und Gruppe am selben Ort — beide werden gemeinsam auf den Ursprung
+        // zurückgesetzt, was optisch nichts verändert. So gibt es keinen Sprung.
+        let stage = null;
+
+        async function goToNode(nodeId, opts) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node || traveling) return;
+
+            const von = nodes.find(n => n.id === currentNodeId) || null;
+            const towards = opts && opts.towards ? opts.towards.clone() : null;
+            // Zielpunkt auf Augenhöhe: der Ring liegt am Boden, der neue
+            // Standpunkt liegt darüber. Die Strecke wird begrenzt, damit die
+            // Kamera bei einem weit entfernten Ring nicht aus der Panoramakugel
+            // herausfährt — von außen wäre sie nur als Kugel zu sehen.
+            let ziel = null;
+            if (towards) {
+                ziel = new THREE.Vector3(towards.x, 0, towards.z);
+                const weite = ziel.length();
+                if (weite > WALK_MAX) ziel.multiplyScalar(WALK_MAX / weite);
+            }
+
+            traveling = true;
+            closeTag();
+            tagLayer.innerHTML = '';
+            tagEls = [];
+            spin.classList.add('show');
+
+            // Beim Betreten gilt die erste Variante, sofern der Aufruf keine
+            // andere verlangt (etwa aus einem geteilten Link).
+            currentVariant = 0;
+            if (node.variants && node.variants.length) {
+                const w = opts && typeof opts.variant === 'number' ? opts.variant : 0;
+                if (node.variants[w]) currentVariant = w;
+            }
+            const bild = (node.variants && node.variants[currentVariant])
+                ? node.variants[currentVariant].img : node.img;
+
+            let texture;
+            try { texture = await loadTexture(bild); }
+            catch (err) { traveling = false; spin.classList.remove('show'); return; }
+            spin.classList.remove('show');
+
+            // Blickrichtung geografisch fortführen statt den Zahlenwert zu
+            // übernehmen: sonst zeigt derselbe yaw im nächsten Bild irgendwohin.
+            // Bei `exakt` gilt das nicht: dort ist yaw schon der Wert, der im
+            // Zielbild gemeint ist — aus einem geteilten Link. Umrechnen würde
+            // ihn um die Nordoffsets verdrehen.
+            if (von && !(opts && opts.exakt))
+                yaw = norm180(yaw + (von.north || 0) - (node.north || 0));
+
+            // Wohin der Blick während des Übergangs wandert — siehe BLICKLOGIK.
+            const blickVon  = { yaw: yaw, pitch: pitch };
+            const blickNach = ankunftsBlick(node, von, towards, yaw, pitch,
+                                            opts && opts.exakt);
+            // Greift der Besucher mitten im Übergang zur Maus, gehört ihm der
+            // Blick — dann wird nicht weitergesteuert.
+            let steuert = true;
+
+            const neu = new THREE.Group();
+            const neueKugel = makeSphere(texture);
+            neueKugel.material.opacity = 0;
+            neu.add(neueKugel);
+
+            const neuePorts = makePorts(node);
+            neuePorts.forEach(p => { p.mesh.material.opacity = 0; neu.add(p.mesh); });
+            if (ziel) neu.position.copy(ziel);
+            scene.add(neu);
+
+            const altStage = stage;
+            const altKugel = sphere;
+            const altPorts = ports;
+            const start = camera.position.clone();
+
+            // Ab hier gilt die neue Station, damit Ringe und Anzeige stimmen
+            stage = neu;
+            sphere = neueKugel;
+            ports = neuePorts;
+            hoveredPort = null;
+            hidePortHint();
+            currentNodeId = nodeId;
+            setStationChrome(node);
+            renderStationList();
+            buildTags(node);
+
+            const dauer = ziel ? 900 : 520;
+            await tween(dauer, k => {
+                const e = easeInOut(k);
+                if (dragging) steuert = false;
+                if (steuert) {
+                    yaw   = norm180(blickVon.yaw + norm180(blickNach.yaw - blickVon.yaw) * e);
+                    pitch = blickVon.pitch + (blickNach.pitch - blickVon.pitch) * e;
+                }
+                if (ziel) camera.position.lerpVectors(start, ziel, e);
+                neueKugel.material.opacity = e;
+                if (altKugel) altKugel.material.opacity = 1 - e;
+                neuePorts.forEach(p => { if (!p.hover) p.mesh.material.opacity = p.base * e; });
+                altPorts.forEach(p => { p.mesh.material.opacity = Math.max(0, p.base * (1 - e * 2)); });
+            });
+
+            // Kamera und Gruppe gemeinsam zum Ursprung: die Ansicht bleibt
+            // dabei identisch, weil sich nur der Bezugspunkt verschiebt.
+            camera.position.set(0, 0, 0);
+            neu.position.set(0, 0, 0);
+
+            altPorts.forEach(p => { if (p.mesh.parent) p.mesh.parent.remove(p.mesh); p.mesh.material.dispose(); });
+            if (altKugel) { altKugel.geometry.dispose(); altKugel.material.dispose(); }
+            if (altStage) scene.remove(altStage);
+            else if (altKugel) scene.remove(altKugel);
+
+            if (steuert) { yaw = blickNach.yaw; pitch = blickNach.pitch; }
+
+            neueKugel.material.opacity = 1;
+            traveling = false;
+            // Erst jetzt steht die endgültige Blickrichtung – setStationChrome
+            // schreibt den Anker vor dem Übergang und hätte noch die alte drin.
+            writeHash(nodeId);
+        }
+
+        // =====================================================================
+        //  VARIANTEN EINER STATION
+        //  Zwei Aufnahmen vom selben Standpunkt, die sich nur im Mobiliar
+        //  unterscheiden. Da die Position identisch ist, gelten Ports und
+        //  Nordausrichtung für beide — es wird nur die Textur überblendet.
+        //  Kamera, Blickrichtung und Zoom bleiben unangetastet.
+        // =====================================================================
+        const variantBar = document.getElementById('variantBar');
+        let currentVariant = 0;
+
+        function renderVariants(node) {
+            const v = node && node.variants;
+            variantBar.innerHTML = '';
+            variantBar.classList.toggle('show', !!(v && v.length > 1));
+            if (!v || v.length < 2) return;
+            v.forEach((variante, i) => {
+                const b = document.createElement('button');
+                b.textContent = variante.name;
+                if (i === currentVariant) b.className = 'sel';
+                b.addEventListener('click', () => switchVariant(i));
+                variantBar.appendChild(b);
+            });
+        }
+
+        async function switchVariant(i) {
+            const node = nodes.find(n => n.id === currentNodeId);
+            if (!node || !node.variants || traveling || i === currentVariant) return;
+            const variante = node.variants[i];
+            if (!variante) return;
+
+            traveling = true;                 // sperrt Klicks während der Überblendung
+            spin.classList.add('show');
+            let texture;
+            try { texture = await loadTexture(variante.img); }
+            catch (err) { traveling = false; spin.classList.remove('show'); return; }
+            spin.classList.remove('show');
+
+            const alt = sphere;
+            sphere = makeSphere(texture);
+            sphere.material.opacity = 0;
+            stage.add(sphere);
+
+            currentVariant = i;
+            renderVariants(node);
+            writeHash(node.id);
+
+            await tween(420, k => {
+                const e = easeInOut(k);
+                sphere.material.opacity = e;
+                if (alt) alt.material.opacity = 1 - e;
+            });
+
+            if (alt) { stage.remove(alt); alt.geometry.dispose(); alt.material.dispose(); }
+            sphere.material.opacity = 1;
+            traveling = false;
+        }
+
+        // Alles, was beim Ankommen an der Oberfläche nachzuziehen ist
+        function setStationChrome(node) {
+            document.getElementById('stationName').textContent = node.name;
+            document.getElementById('tStation').textContent = node.id;
+            lastReading = null;
+            document.getElementById('tYaw').textContent = '—';
+            document.getElementById('tPitch').textContent = '—';
+            selectedTarget = null;     // Auswahl gilt nur innerhalb einer Station
+            selectedTag = null;
+            renderVariants(node);
+            if (toolOpen) { fillTargetOptions(); renderProgress(); renderPortList();
+                            renderTagList(); refreshAddButton(); }
+            versteckeGehen();          // gilt nur für die Station, in der gesetzt wurde
+            updateAreaChrome(node);
+            writeHash(node.id);
+        }
+
+        // =====================================================================
+        //  MAUS
+        // =====================================================================
+        const raycaster = new THREE.Raycaster();
+        let dragging = false, didDrag = false, lastX = 0, lastY = 0;
+        let lastPointer = null;      // letzte Zeigerposition, für den Ring nach dem Drehen
+
+        function pointerNDC(e) {
+            const r = canvas.getBoundingClientRect();
+            return new THREE.Vector2(
+                ((e.clientX - r.left) / r.width) * 2 - 1,
+                -((e.clientY - r.top) / r.height) * 2 + 1
+            );
+        }
+
+        function pickPort(e) {
+            if (!ports.length) return null;
+            raycaster.setFromCamera(pointerNDC(e), camera);
+            const hit = raycaster.intersectObjects(ports.map(p => p.mesh), false)[0];
+            return hit ? ports.find(p => p.mesh === hit.object) : null;
+        }
+
+        // Eigener Zeiger: das Waldsignet als Cursor-Bild, mit dunkler Kontur,
+        // damit es auf hellen und dunklen Aufnahmen gleich gut sichtbar ist.
+        (function setLogoCursor() {
+            const d = document.querySelector('#aig-wald path').getAttribute('d');
+            if (!d) return;
+            const svg =
+                '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="26" viewBox="-8 -8 138.46 119">' +
+                '<path d="' + d + '" fill="none" stroke="rgba(20,28,20,0.62)" stroke-width="14" stroke-linejoin="round"/>' +
+                '<path d="' + d + '" fill="#F2EFED"/></svg>';
+            canvas.style.cursor =
+                'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") 15 13, crosshair';
+        })();
+
+        canvas.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;      // nur die linke Taste zieht
+            dragging = true; didDrag = false;
+            lastX = e.clientX; lastY = e.clientY;
+            reticle.visible = false;
+            hidePortHint();          // beim Umschauen stört er
+        });
+
+        // Rechte Taste bleibt ohne Wirkung, wie bei Matterport – auch ohne
+        // Browser-Kontextmenü, das mitten im Rundgang nur stört.
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        window.addEventListener('mousemove', e => {
+            if (dragging) {
+                const dx = e.clientX - lastX, dy = e.clientY - lastY;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDrag = true;
+                // Ziehrichtung wie bei Matterport: das Bild folgt der Hand.
+                // Nach rechts ziehen schiebt das Panorama nach rechts, der Blick
+                // wandert also nach links. Vorher war beides umgekehrt.
+                const speed = 0.12 * (camera.fov / BASE_FOV);
+                yaw   += dx * speed;
+                pitch += dy * speed;
+                pitch = Math.max(-85, Math.min(85, pitch));
+                lastX = e.clientX; lastY = e.clientY;
+                return;
+            }
+            if (traveling) { reticle.visible = false; hidePortHint(); return; }
+            const hit = pickPort(e);
+            if (hit !== hoveredPort) {
+                if (hoveredPort) {
+                    hoveredPort.hover = false;
+                    hoveredPort.mesh.scale.setScalar(portScale(hoveredPort));
+                    hoveredPort.mesh.material.opacity = hoveredPort.base;
+                }
+                hoveredPort = hit;
+                if (hoveredPort) {
+                    hoveredPort.hover = true;
+                    hoveredPort.mesh.scale.setScalar(portScale(hoveredPort));
+                    hoveredPort.mesh.material.opacity = 1;
+                }
+                showPortHint(hoveredPort);
+            }
+            lastPointer = e;
+            updateReticle(e);
+        });
+
+        window.addEventListener('mouseup', e => {
+            dragging = false;
+            if (e.target === canvas) { lastPointer = e; updateReticle(e); }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            lastPointer = null;
+            reticle.visible = false;
+        });
+
+        canvas.addEventListener('click', e => {
+            if (didDrag || traveling) return;
+
+            if (toolOpen) {
+                // Im Port-Modus wählt ein Klick auf einen bestehenden Ring
+                // diesen aus, statt daneben eine neue Messung zu setzen.
+                if (toolMode === 'port') {
+                    const treffer = pickPort(e);
+                    if (treffer && treffer.nodeId !== selectedTarget) { selectPort(treffer.nodeId); return; }
+                }
+                const r = canvas.getBoundingClientRect();
+                const d = dirFromScreen((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+                lastReading = yawPitchFromDir(d);
+                document.getElementById('tYaw').textContent   = lastReading.yaw.toFixed(1) + '°';
+                document.getElementById('tPitch').textContent = lastReading.pitch.toFixed(1) + '°';
+                // Entfernung aus dem Winkel vorbelegen; überschreibbar
+                if (toolMode === 'port') document.getElementById('tDist').value = suggestDistance(d);
+                refreshAddButton();
+                return;
+            }
+
+            const hit = pickPort(e);
+            if (hit) {
+                stopAutoplay();
+                goToNode(hit.nodeId, { walk: true, towards: hit.mesh.position });
+            } else if (openTag !== null) {
+                closeTag();          // Klick ins Leere schließt die Infokarte
+            }
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, camera.fov + e.deltaY * 0.045));
+            camera.updateProjectionMatrix();
+        }, { passive: false });
+
+        // =====================================================================
+        //  OBERFLÄCHE
+        // =====================================================================
+        const panel = document.getElementById('panel');
+        const tool = document.getElementById('tool');
+
+        const areaName = id => (areas.find(a => a.id === id) || {}).name || '—';
+
+        // =====================================================================
+        //  STATIONSLISTE MIT GRUPPEN
+        //  Mehrere Standpunkte in einem Raum sind mehrere Blickwinkel, keine
+        //  eigenen Zimmer. „Wohnzimmer 2" bis „Wohnzimmer 5" stehen deshalb
+        //  nicht mehr einzeln in der Liste, sondern klappen unter „Wohnzimmer"
+        //  auf. Die Gruppe ergibt sich aus dem Namen ohne die angehängte Zahl —
+        //  ein Knoten kann sie mit `gruppe: 'Name'` auch selbst vorgeben.
+        // =====================================================================
+        const gruppeVon = n => n.gruppe || n.name.replace(/\s+\d+$/, '');
+
+        // Ausdrückliche Wahl des Besuchers je Gruppe: true = auf, false = zu.
+        // Fehlt der Eintrag, gilt die Voreinstellung (offen, wenn man in der
+        // Gruppe steht oder gesucht wird). Überlebt das Neuzeichnen der Liste —
+        // sonst klappte die Gruppe des aktuellen Standpunkts immer wieder auf,
+        // auch wenn man sie gerade zugeklappt hatte.
+        const gruppenZustand = {};
+
+        function renderStationList() {
+            const box = document.getElementById('stationList');
+            const q = document.getElementById('searchInput').value.trim().toLowerCase();
+            const treffer = nodes.filter(n =>
+                !q || n.name.toLowerCase().includes(q) || n.id.includes(q) || areaName(n.area).toLowerCase().includes(q));
+
+            box.innerHTML = '';
+            if (!treffer.length) {
+                const p = document.createElement('div');
+                p.className = 'none';
+                p.textContent = 'Keine Station gefunden.';
+                box.appendChild(p);
+                return;
+            }
+
+            // Nach Gruppe bündeln, Reihenfolge der Stationen beibehalten
+            const gruppen = [];
+            const nach = {};
+            treffer.forEach(n => {
+                const g = gruppeVon(n);
+                if (!nach[g]) { nach[g] = { name: g, stationen: [] }; gruppen.push(nach[g]); }
+                nach[g].stationen.push(n);
+            });
+            // Innerhalb der Gruppe nach der angehängten Zahl ordnen, damit
+            // „Wohnzimmer" vor „Wohnzimmer 2" steht und nicht die
+            // Datenreihenfolge durchschlägt.
+            const nummer = n => { const m = n.name.match(/\s+(\d+)$/); return m ? +m[1] : 0; };
+            gruppen.forEach(g => g.stationen.sort((a, b) => nummer(a) - nummer(b)));
+
+            const zeile = (n, klein) => {
+                const b = document.createElement('button');
+                b.appendChild(document.createTextNode(klein ? n.name : n.name));
+                if (!klein) {
+                    const s = document.createElement('small');
+                    s.textContent = areaName(n.area);
+                    b.appendChild(s);
+                }
+                if (n.id === currentNodeId) b.className = 'current';
+                b.addEventListener('click', () => {
+                    panel.classList.remove('open');
+                    stopAutoplay();
+                    goToNode(n.id);
+                });
+                return b;
+            };
+
+            gruppen.forEach(g => {
+                // Einzelne Station: unverändert eine Zeile
+                if (g.stationen.length === 1) { box.appendChild(zeile(g.stationen[0], false)); return; }
+
+                const hier = g.stationen.some(n => n.id === currentNodeId);
+                // Eine Suche zeigt immer alle Treffer; sonst gilt die Wahl des
+                // Besuchers, und ohne Wahl die Gruppe des aktuellen Standpunkts.
+                const auf = q ? true
+                          : (g.name in gruppenZustand ? gruppenZustand[g.name] : hier);
+
+                const kopf = document.createElement('button');
+                kopf.className = 'gruppe' + (auf ? ' auf' : '') + (hier ? ' enthaelt' : '');
+                kopf.innerHTML =
+                    '<svg class="pfeil" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>' +
+                    '<span class="txt"></span><span class="anz"></span>';
+                kopf.querySelector('.txt').textContent = g.name;
+                kopf.querySelector('.anz').textContent = g.stationen.length + ' Blicke';
+                kopf.setAttribute('aria-expanded', auf ? 'true' : 'false');
+
+                const liste = document.createElement('div');
+                liste.className = 'blicke' + (auf ? ' auf' : '');
+                g.stationen.forEach(n => liste.appendChild(zeile(n, true)));
+
+                kopf.addEventListener('click', () => {
+                    const jetzt = liste.classList.toggle('auf');
+                    kopf.classList.toggle('auf', jetzt);
+                    kopf.setAttribute('aria-expanded', jetzt ? 'true' : 'false');
+                    gruppenZustand[g.name] = jetzt;
+                });
+
+                box.appendChild(kopf);
+                box.appendChild(liste);
+            });
+        }
+
+        // Kompakt in einer Zeile, damit das Menü nicht überläuft
+        function renderSummary() {
+            const box = document.getElementById('summary');
+            const teile = areas.map(a => nodes.filter(x => x.area === a.id).length + '× ' + a.name);
+            box.className = 'none';
+            box.textContent = nodes.length + ' Stationen · ' + teile.join(' · ')
+                + ' · ' + tags.length + (tags.length === 1 ? ' Infopoint' : ' Infopoints');
+        }
+
+        document.getElementById('searchInput').addEventListener('input', renderStationList);
+
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            const auf = panel.classList.toggle('open');
+            areaBox.classList.remove('open');
+            if (auf) { renderSummary(); renderStationList(); document.getElementById('searchInput').focus(); }
+        });
+
+        // ===== BEREICHSWAHL =====
+        const areaBox = document.getElementById('areaList');
+        const areaBtn = document.getElementById('areaBtn');
+
+        function updateAreaChrome(node) {
+            const i = areas.findIndex(a => a.id === node.area);
+            document.getElementById('areaNum').textContent = i < 0 ? '?' : (i + 1);
+            areaBtn.setAttribute('data-tip', 'Bereich: ' + areaName(node.area));
+        }
+
+        function renderAreaList() {
+            areaBox.innerHTML = '';
+            const aktuell = nodes.find(n => n.id === currentNodeId);
+            areas.forEach((a, i) => {
+                const inArea = nodes.filter(n => n.area === a.id);
+                const b = document.createElement('button');
+                b.appendChild(document.createTextNode((i + 1) + '  ' + a.name));
+                const c = document.createElement('i');
+                c.textContent = inArea.length;
+                b.appendChild(c);
+                if (aktuell && aktuell.area === a.id) b.className = 'current';
+                b.addEventListener('click', () => {
+                    areaBox.classList.remove('open');
+                    stopAutoplay();
+                    // zur ersten Station des Bereichs, falls man nicht schon dort ist
+                    if (!aktuell || aktuell.area !== a.id) goToNode(inArea[0].id);
+                });
+                areaBox.appendChild(b);
+            });
+        }
+
+        areaBtn.addEventListener('click', () => {
+            const auf = areaBox.classList.toggle('open');
+            panel.classList.remove('open');
+            planBox.classList.remove('open');
+            planBtn.classList.remove('on');
+            areaBtn.classList.toggle('on', auf);
+            if (auf) renderAreaList();
+        });
+
+        // =====================================================================
+        //  GRUNDRISS: zeichnen, aktuellen Standpunkt zeigen, Klick zum Springen
+        //
+        //  Der Plan wird einmal als SVG aufgebaut. Danach ändert sich nur die
+        //  Hervorhebung und der Blickkegel — beides pro Bild, damit der Kegel
+        //  beim Umschauen mitdreht.
+        //
+        //  Der Kegel zeigt die wahre Blickrichtung: Peilung der Tour ist
+        //  `yaw + north`, im Grundriss gedreht um `GRUNDRISS.drehung`. Im SVG
+        //  entspricht 0° „nach oben"; `rotate()` dreht im Uhrzeigersinn, also
+        //  passt der Winkel unverändert.
+        // =====================================================================
+        const planBtn = document.getElementById('planBtn');
+        const planBox = document.getElementById('planBox');
+        const planSvg = document.getElementById('planSvg');
+        const planWo = document.getElementById('planWo');
+        const PLAN_M = 21;           // Pixel pro Meter im Fenster
+        const PLAN_RAND = 12;
+        const WAND_A = 0.14, WAND_I = 0.12;   // Wandstärken in Metern, schematisch
+        let planPunkte = {};         // Stations-ID -> <circle>
+        let planKegel = null, planFertig = false;
+
+        function planBauen() {
+            if (planFertig) return;
+            // Die Außenwand liegt außerhalb der Raumrechtecke und muss in die
+            // Ausdehnung hinein, sonst wird sie am Rand abgeschnitten.
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            GRUNDRISS.raeume.forEach(r => r.rects.forEach(([x, y, w, h]) => {
+                x0 = Math.min(x0, x - WAND_A); y0 = Math.min(y0, y - WAND_A);
+                x1 = Math.max(x1, x + w + WAND_A); y1 = Math.max(y1, y + h + WAND_A);
+            }));
+            const W = (x1 - x0) * PLAN_M + 2 * PLAN_RAND;
+            const H = (y1 - y0) * PLAN_M + 2 * PLAN_RAND;
+            const sx = x => PLAN_RAND + (x - x0) * PLAN_M;
+            const sy = y => PLAN_RAND + (y - y0) * PLAN_M;
+
+            const NS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(NS, 'svg');
+            svg.setAttribute('width', W);
+            svg.setAttribute('height', H);
+            svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+            const kasten = (x, y, w, h, klasse) => {
+                const e = document.createElementNS(NS, 'rect');
+                e.setAttribute('x', sx(x)); e.setAttribute('y', sy(y));
+                e.setAttribute('width', w * PLAN_M); e.setAttribute('height', h * PLAN_M);
+                e.setAttribute('class', klasse);
+                svg.appendChild(e);
+                return e;
+            };
+
+            const innen = GRUNDRISS.raeume.filter(r => !r.aussen);
+            // 1. Außenflächen zuerst, sie liegen unter den Wänden
+            GRUNDRISS.raeume.filter(r => r.aussen).forEach(r =>
+                r.rects.forEach(([x, y, w, h]) => kasten(x, y, w, h, 'aussen')));
+            // 2. Wandkörper: jedes Rechteck vergrößert, die Vereinigung ergibt
+            //    Außenwand und Innenwände
+            innen.forEach(r => r.rects.forEach(([x, y, w, h]) =>
+                kasten(x - WAND_A, y - WAND_A, w + 2 * WAND_A, h + 2 * WAND_A, 'wand')));
+            // 3. Raumflächen: verkleinert, dazwischen bleibt die Wand stehen
+            innen.forEach(r => r.rects.forEach(([x, y, w, h]) =>
+                kasten(x + WAND_I / 2, y + WAND_I / 2, w - WAND_I, h - WAND_I, 'raum')));
+            // 4. Türöffnungen mit Laibungsstrichen
+            (GRUNDRISS.tueren || []).forEach(([x, y, w, h]) => {
+                kasten(x, y, w, h, 'raum');
+                const strich = (ax, ay, bx, by) => {
+                    const l = document.createElementNS(NS, 'line');
+                    l.setAttribute('x1', sx(ax)); l.setAttribute('y1', sy(ay));
+                    l.setAttribute('x2', sx(bx)); l.setAttribute('y2', sy(by));
+                    l.setAttribute('class', 'laibung');
+                    svg.appendChild(l);
+                };
+                if (w > h) { strich(x, y, x, y + h); strich(x + w, y, x + w, y + h); }
+                else { strich(x, y, x + w, y); strich(x, y + h, x + w, y + h); }
+            });
+
+            // 5. Beschriftung nur, wo der Name auch hineinpasst — sonst ragt er
+            //    in den Nachbarraum. Grobe Schätzung: 4,6 px je Zeichen bei
+            //    8,5 px Schriftgröße.
+            GRUNDRISS.raeume.forEach(r => {
+                const gr = r.rects.slice().sort((a, b) => b[2] * b[3] - a[2] * a[3])[0];
+                if (gr[2] * PLAN_M > r.name.length * 4.6 + 8) {
+                    const t = document.createElementNS(NS, 'text');
+                    t.setAttribute('x', sx(gr[0]) + 5);
+                    t.setAttribute('y', sy(gr[1]) + 12);
+                    t.setAttribute('class', 'rname');
+                    t.textContent = r.name;
+                    svg.appendChild(t);
+                }
+            });
+
+            // Blickkegel vor die Punkte, damit er sie nicht verdeckt
+            planKegel = document.createElementNS(NS, 'path');
+            planKegel.setAttribute('class', 'kegel');
+            planKegel.setAttribute('d', 'M0 0 L-13 -30 A32 32 0 0 1 13 -30 Z');
+            planKegel.style.display = 'none';
+            svg.appendChild(planKegel);
+
+            planPunkte = {};
+            Object.keys(GRUNDRISS.punkte).forEach(id => {
+                const [x, y] = GRUNDRISS.punkte[id];
+                const c = document.createElementNS(NS, 'circle');
+                c.setAttribute('cx', sx(x)); c.setAttribute('cy', sy(y));
+                c.setAttribute('r', 4.6);
+                c.setAttribute('class', 'pt');
+                const st = nodes.find(n => n.id === id);
+                const titel = document.createElementNS(NS, 'title');
+                titel.textContent = st ? st.name : id;
+                c.appendChild(titel);
+                c.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    if (id === currentNodeId || traveling) return;
+                    stopAutoplay();
+                    goToNode(id);
+                });
+                svg.appendChild(c);
+                planPunkte[id] = c;
+            });
+
+            planSvg.appendChild(svg);
+            planFertig = true;
+        }
+
+        // Hervorhebung und Kegel nachziehen
+        function planAktualisieren() {
+            if (!planFertig || !planBox.classList.contains('open')) return;
+            const drin = Object.prototype.hasOwnProperty.call(GRUNDRISS.punkte, currentNodeId);
+            Object.keys(planPunkte).forEach(id =>
+                planPunkte[id].classList.toggle('hier', id === currentNodeId));
+
+            const node = nodes.find(n => n.id === currentNodeId);
+            planWo.textContent = drin ? (node ? node.name : currentNodeId)
+                                      : 'Außerhalb der Wohnung';
+
+            if (!drin) { planKegel.style.display = 'none'; return; }
+            const [mx, my] = GRUNDRISS.punkte[currentNodeId];
+            const cx = PLAN_RAND + (mx - planX0) * PLAN_M;
+            const cy = PLAN_RAND + (my - planY0) * PLAN_M;
+            // Peilung der Tour -> Peilung im Grundriss: b_plan = b_tour − drehung.
+            // Im SVG dreht rotate() aber im Uhrzeigersinn, während die Konvention
+            // der Anwendung (Richtung = −sin, −cos) gegen den Uhrzeigersinn läuft.
+            // Deshalb das Vorzeichen umdrehen — sonst zeigt der Kegel spiegelbildlich.
+            const richtung = norm180(GRUNDRISS.drehung - (yaw + (node && node.north || 0)));
+            planKegel.setAttribute('transform',
+                'translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ') rotate(' + richtung.toFixed(1) + ')');
+            planKegel.style.display = '';
+        }
+
+        // Nullpunkt des Plans, damit der Kegel dieselbe Umrechnung nutzt wie
+        // planBauen() — dort ist die Außenwand mit eingerechnet.
+        let planX0 = 0, planY0 = 0;
+        (function () {
+            let x0 = Infinity, y0 = Infinity;
+            GRUNDRISS.raeume.forEach(r => r.rects.forEach(([x, y]) => {
+                x0 = Math.min(x0, x - WAND_A); y0 = Math.min(y0, y - WAND_A);
+            }));
+            planX0 = x0; planY0 = y0;
+        })();
+
+        planBtn.addEventListener('click', () => {
+            const auf = !planBox.classList.contains('open');
+            planBauen();
+            planBox.classList.toggle('open', auf);
+            planBtn.classList.toggle('on', auf);
+            if (auf) {
+                areaBox.classList.remove('open');
+                areaBtn.classList.remove('on');
+                panel.classList.remove('open');
+                planAktualisieren();
+            }
+        });
+
+        // ===== TEILEN: Link auf die aktuelle Ansicht =====
+        // Position, Blickrichtung und Zoom stecken im Anker, damit ein geteilter
+        // Link genau dort öffnet, wo der Absender stand.
+        function writeHash(nodeId) {
+            let h = '#' + nodeId + '/' + yaw.toFixed(1) + '/' + pitch.toFixed(1) + '/' + camera.fov.toFixed(0);
+            if (currentVariant) h += '/' + currentVariant;      // nur wenn nicht die erste
+            history.replaceState(null, '', location.pathname + location.search + h);
+        }
+
+        function readHash() {
+            const m = (location.hash || '').replace('#', '').split('/');
+            if (!m[0]) return null;
+            const node = nodes.find(n => n.id === m[0]);
+            if (!node) return null;
+            return {
+                id: node.id,
+                yaw:   isFinite(parseFloat(m[1])) ? parseFloat(m[1]) : 0,
+                pitch: isFinite(parseFloat(m[2])) ? parseFloat(m[2]) : 0,
+                fov:   isFinite(parseFloat(m[3])) ? parseFloat(m[3]) : BASE_FOV,
+                variant: isFinite(parseInt(m[4], 10)) ? parseInt(m[4], 10) : 0
+            };
+        }
+
+        // Ein Anker, der sich von außen ändert (eingefügter Link, Zurück-Taste),
+        // muss auch im laufenden Tab greifen — der Browser lädt dabei nicht neu.
+        // Eigene Aktualisierungen nutzen replaceState und lösen das nicht aus.
+        window.addEventListener('hashchange', () => {
+            const z = readHash();
+            if (!z || traveling) return;
+            if (z.id === currentNodeId && Math.abs(z.yaw - yaw) < 0.2 && Math.abs(z.pitch - pitch) < 0.2) return;
+            stopAutoplay();
+            yaw = z.yaw;
+            pitch = z.pitch;
+            camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, z.fov));
+            camera.updateProjectionMatrix();
+            if (z.id !== currentNodeId) goToNode(z.id, { variant: z.variant, exakt: true });
+            else if (z.variant !== currentVariant) switchVariant(z.variant);
+        });
+
+        function toast(text) {
+            const t = document.getElementById('toast');
+            t.textContent = text;
+            t.classList.add('show');
+            clearTimeout(toast.timer);
+            toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+        }
+
+        document.getElementById('shareBtn').addEventListener('click', async () => {
+            if (currentNodeId) writeHash(currentNodeId);
+            const url = location.href;
+            try {
+                await navigator.clipboard.writeText(url);
+                toast('Link auf diese Ansicht kopiert');
+            } catch (err) {
+                toast('Kopieren nicht möglich – Link steht in der Adresszeile');
+            }
+        });
+
+        // ===== BEDIENHILFE =====
+        const help = document.getElementById('help');
+        const HELP_KEY = 'aig-tour-hilfe-gesehen';
+
+        function openHelp() { help.classList.add('open'); }
+        function closeHelp() {
+            help.classList.remove('open');
+            try { localStorage.setItem(HELP_KEY, '1'); } catch (err) { /* privates Fenster */ }
+        }
+
+        document.getElementById('helpBtn').addEventListener('click', openHelp);
+        document.getElementById('helpClose').addEventListener('click', closeHelp);
+        document.getElementById('helpOk').addEventListener('click', closeHelp);
+        help.addEventListener('click', e => { if (e.target === help) closeHelp(); });
+
+        // Beim ersten Besuch von selbst zeigen
+        (function firstVisit() {
+            let gesehen = '1';
+            try { gesehen = localStorage.getItem(HELP_KEY); } catch (err) { gesehen = null; }
+            if (!gesehen) setTimeout(openHelp, 1200);
+        })();
+
+        // ===== TASTATUR =====
+        window.addEventListener('keydown', e => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            const schritt = e.shiftKey ? 9 : 3;
+            switch (e.key) {
+                case 'ArrowLeft':  yaw += schritt; break;
+                case 'ArrowRight': yaw -= schritt; break;
+                case 'ArrowUp':    pitch = Math.min(85, pitch + schritt); break;
+                case 'ArrowDown':  pitch = Math.max(-85, pitch - schritt); break;
+                case ' ':          playBtn.click(); break;
+                case 'Escape':
+                    if (help.classList.contains('open')) closeHelp();
+                    else {
+                        panel.classList.remove('open');
+                        areaBox.classList.remove('open');
+                        areaBtn.classList.remove('on');
+                        planBox.classList.remove('open');
+                        planBtn.classList.remove('on');
+                        closeTag();
+                    }
+                    break;
+                default: return;
+            }
+            e.preventDefault();
+        });
+
+        // =====================================================================
+        //  WERKZEUG
+        //  Zwei Betriebsarten mit derselben Messung: Ports landen auf der
+        //  Bodenebene, Infopoints bleiben genau da, wo geklickt wurde.
+        //  „Übernehmen" zeigt das Ergebnis sofort in der Szene und legt die
+        //  fertige Code-Zeile in den Sammelkorb.
+        // =====================================================================
+        let toolMode = 'port';
+        // Statt einzelner Zeilen wird festgehalten, welche Stationen verändert
+        // wurden. „Alles kopieren" gibt dann deren komplettes links-Array aus.
+        // Nur so lassen sich auch Löschungen abbilden – eine gelöschte
+        // Verbindung ist keine Zeile, die man irgendwo einfügen könnte.
+        const touched = new Set();  // Stations-IDs mit geänderten Ports
+        const newTags = [];         // neu gesetzte Infopoints
+
+        // =====================================================================
+        //  ZWISCHENSICHERUNG
+        //  Gesetzte Ports und Infopoints leben zunächst nur in der offenen Seite.
+        //  Ohne Sicherung war eine ganze Messrunde beim Schließen des Tabs
+        //  verloren. Nach jeder Änderung wird deshalb ein Entwurf im Browser
+        //  abgelegt und beim nächsten Laden wiederhergestellt.
+        // =====================================================================
+        const DRAFT_KEY = 'aig-tour-entwurf';
+        let draftOk = false;        // ob die Sicherung tatsächlich schreibt
+
+        function saveDraft() {
+            const links = {};
+            nodes.forEach(n => { if (touched.has(n.id)) links[n.id] = n.links; });
+            try {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                    stand: new Date().toISOString(), links: links, tags: newTags
+                }));
+                draftOk = true;
+            } catch (err) {
+                draftOk = false;    // privates Fenster oder Speicher voll
+            }
+            updateCount();
+        }
+
+        function loadDraft() {
+            let raw = null;
+            try { raw = localStorage.getItem(DRAFT_KEY); } catch (err) { return null; }
+            if (!raw) return null;
+            let d;
+            try { d = JSON.parse(raw); } catch (err) { return null; }
+            if (!d) return null;
+
+            Object.keys(d.links || {}).forEach(id => {
+                const n = nodes.find(x => x.id === id);
+                if (n && Array.isArray(d.links[id]) && d.links[id].length) {
+                    n.links = d.links[id];
+                    touched.add(id);
+                }
+            });
+            (d.tags || []).forEach(t => { tags.push(t); newTags.push(t); });
+            if (touched.size || newTags.length) { draftOk = true; return d.stand || 'unbekannt'; }
+            return null;
+        }
+
+        function discardDraft() {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (err) { /* egal */ }
+            toast('Entwurf verworfen — die Seite lädt neu');
+            setTimeout(() => location.reload(), 900);
+        }
+
+        // Warnen nur, wenn die Sicherung nicht greift — sonst wäre es Gängelei
+        window.addEventListener('beforeunload', e => {
+            if (!WERKZEUG) return;          // Gäste nichts fragen
+            if ((touched.size || newTags.length) && !draftOk) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Text so escapen, dass die erzeugte Zeile gültiger JavaScript-Code bleibt –
+        // Zeilenumbrüche und Backslashes würden sie sonst zerreißen.
+        function jsQuote(s) {
+            return String(s)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/\r?\n/g, '\\n');
+        }
+
+        const tabPort = document.getElementById('tabPort');
+        const tabInfo = document.getElementById('tabInfo');
+        const tAdd = document.getElementById('tAdd');
+
+        function setToolMode(mode) {
+            // Auswahl gilt nur im Port-Modus
+            if (mode === 'info' && selectedTarget) {
+                selectedTarget = null;
+                markSelection();
+                renderPortList();
+            }
+            // und umgekehrt: die Infopoint-Auswahl nur im Infopoint-Modus
+            if (mode === 'port' && selectedTag !== null) {
+                selectedTag = null;
+                markTagSelection();
+            }
+            toolMode = mode;
+            const isPort = mode === 'port';
+            tabPort.classList.toggle('sel', isPort);
+            tabInfo.classList.toggle('sel', !isPort);
+            document.getElementById('tPortFields').style.display = isPort ? 'block' : 'none';
+            document.getElementById('tInfoFields').style.display = isPort ? 'none' : 'block';
+            // Fläche nur beim Infopoint zeigen — beim Port zählt die Richtung
+            document.getElementById('tSurfaceRow').style.display = isPort ? 'none' : 'flex';
+            document.getElementById('tHint').innerHTML = isPort
+                ? 'Umschauen geht weiter. Klick auf die Stelle am <em>Boden</em>, wo der Ring liegen soll.'
+                : 'Klick genau auf das, was beschrieben werden soll — Infopoints werden nicht auf den Boden gelegt. Ein Klick auf einen gesetzten Punkt wählt ihn zum Bearbeiten aus.';
+            renderTagList();
+            refreshAddButton();
+        }
+
+        // =====================================================================
+        //  INFOPOINT AUSWÄHLEN UND BEARBEITEN
+        //  Ein gesetzter Infopoint war bisher endgültig — Überschrift, Text und
+        //  Richtung ließen sich nur noch in der Datei ändern. Hier bekommt er
+        //  dieselbe Behandlung wie ein Port: anwählen, ändern, löschen.
+        //
+        //  Angewählt wird über die Liste im Werkzeug oder direkt mit einem Klick
+        //  auf den goldenen Punkt im Bild, solange das Werkzeug im
+        //  Infopoint-Modus offen ist. Ein neuer Klick ins Bild setzt dann die
+        //  Richtung neu, ohne den Text zu verlieren.
+        // =====================================================================
+        let selectedTag = null;      // Index in `tags`, nicht in der Liste
+        const TEXT_MAX = 400;        // muss zum maxlength des Feldes passen
+
+        // Wie ein Infopoint benannt wird, wo ein Name gebraucht wird — in der
+        // Liste, im Tooltip, in Meldungen. Die Überschrift ist freiwillig,
+        // deshalb Ersatz in dieser Reihenfolge.
+        function tagLabel(tag) {
+            if (tag.title && tag.title.trim()) return tag.title.trim();
+            if (tag.link && tag.link.label && tag.link.label.trim()) return tag.link.label.trim();
+            const zeile = (tag.text || '').split('\n')[0].trim();
+            if (zeile) return zeile.length > 40 ? zeile.slice(0, 39) + '…' : zeile;
+            return 'Infopoint';
+        }
+
+        function textZaehlerZeigen() {
+            const f = document.getElementById('tText');
+            const z = document.getElementById('tTextZahl');
+            if (!f || !z) return;
+            const n = f.value.length;
+            z.textContent = n + ' / ' + TEXT_MAX;
+            z.classList.toggle('knapp', n > TEXT_MAX - 40);
+        }
+
+        function tagFields() {
+            return {
+                title: document.getElementById('tTitle'),
+                text:  document.getElementById('tText'),
+                url:   document.getElementById('tUrl'),
+                label: document.getElementById('tUrlText')
+            };
+        }
+
+        function clearTagFields() {
+            const f = tagFields();
+            f.title.value = ''; f.text.value = ''; f.url.value = ''; f.label.value = '';
+            textZaehlerZeigen();
+        }
+
+        // Punkte dieser Station in der Reihenfolge von `tags`, mit ihrem Index
+        function tagsHier() {
+            const treffer = [];
+            tags.forEach((t, i) => {
+                tagPlacements(t).forEach(ort => {
+                    if (ort.nodeId === currentNodeId) treffer.push({ index: i, tag: t, ort: ort });
+                });
+            });
+            return treffer;
+        }
+
+        function renderTagList() {
+            const box = document.getElementById('tTags');
+            if (!box) return;
+            const liste = tagsHier();
+            box.innerHTML = '';
+            if (!liste.length) {
+                box.innerHTML = '<div class="leer">Hier ist noch keiner gesetzt.</div>';
+                return;
+            }
+            liste.forEach(e => {
+                const row = document.createElement('div');
+                row.className = 'prow' + (selectedTag === e.index ? ' sel' : '');
+                const name = document.createElement('span');
+                name.textContent = tagLabel(e.tag);
+                row.appendChild(name);
+                const wo = document.createElement('em');
+                wo.textContent = (e.tag.link && e.tag.link.url ? 'Link' : '')
+                    + (e.tag.text ? '' : (e.tag.link && e.tag.link.url ? ' · ' : '') + 'ohne Text');
+                if (wo.textContent) row.appendChild(wo);
+                row.addEventListener('click', () => selectTag(e.index));
+
+                const del = document.createElement('button');
+                del.setAttribute('aria-label', 'Infopoint entfernen');
+                del.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>';
+                del.addEventListener('click', ev => { ev.stopPropagation(); deleteTag(e.index); });
+                row.appendChild(del);
+                box.appendChild(row);
+            });
+        }
+
+        function selectTag(index) {
+            const tag = tags[index];
+            if (!tag) return;
+            const orte = tagPlacements(tag);
+            const ort = orte.find(o => o.nodeId === currentNodeId) || orte[0];
+
+            selectedTag = index;
+            setToolMode('info');
+            closeTag();                       // die Besucherkarte stört beim Bearbeiten
+
+            const f = tagFields();
+            f.title.value = tag.title || '';
+            f.text.value  = tag.text || '';
+            f.url.value   = (tag.link && tag.link.url) || '';
+            f.label.value = (tag.link && tag.link.label) || '';
+            textZaehlerZeigen();
+
+            // Bestehende Richtung übernehmen, damit ein reines Ändern des Textes
+            // die Position unangetastet lässt
+            lastReading = { yaw: ort.yaw, pitch: ort.pitch };
+            document.getElementById('tYaw').textContent = ort.yaw.toFixed(1) + '°';
+            document.getElementById('tPitch').textContent = ort.pitch.toFixed(1) + '°';
+
+            markTagSelection();
+            renderTagList();
+            refreshAddButton();
+        }
+
+        function clearTagSelection() {
+            selectedTag = null;
+            lastReading = null;
+            clearTagFields();
+            document.getElementById('tYaw').textContent = '—';
+            document.getElementById('tPitch').textContent = '—';
+            markTagSelection();
+            renderTagList();
+            refreshAddButton();
+        }
+
+        // Der ausgewählte Punkt wird im Bild hervorgehoben, damit klar ist,
+        // welcher gerade bearbeitet wird
+        function markTagSelection() {
+            tagEls.forEach(t => t.el.classList.toggle('editing', t.index === selectedTag));
+        }
+
+        function deleteTag(index) {
+            const tag = tags[index];
+            if (!tag) return;
+            const titel = tagLabel(tag);
+            tags.splice(index, 1);
+            const j = newTags.indexOf(tag);
+            if (j >= 0) newTags.splice(j, 1);
+            if (selectedTag === index) selectedTag = null;
+            else if (selectedTag !== null && selectedTag > index) selectedTag--;
+            closeTag();
+            buildTags(nodes.find(n => n.id === currentNodeId));
+            markTagSelection();
+            saveDraft();
+            renderTagList();
+            refreshAddButton();
+            toast('Infopoint „' + titel + '" entfernt');
+        }
+
+        document.getElementById('tTagDel').addEventListener('click', () => {
+            if (selectedTag !== null) deleteTag(selectedTag);
+        });
+        document.getElementById('tTagUnsel').addEventListener('click', clearTagSelection);
+
+        // =====================================================================
+        //  PORT AUSWÄHLEN UND BEARBEITEN
+        //  Im Port-Modus wählt ein Klick auf einen Ring diesen aus, statt eine
+        //  neue Messung zu setzen. Danach kann er verschoben, auf ein anderes
+        //  Ziel umgehängt oder gelöscht werden.
+        // =====================================================================
+        const SEL_COLOR = 0xD4A12C;      // Gold2 als Auswahlfarbe
+        let selectedTarget = null;       // Ziel-ID des ausgewählten Ports
+
+        // Hervorhebung immer relativ zur Grundgröße des Rings, sonst würde ein
+        // ferner Ring beim Anwählen auf Normalgröße zurückfallen
+        function portScale(p) {
+            const f = (p.nodeId === selectedTarget) ? 1.25 : (p.hover ? PORT_HOVER_SCALE : 1);
+            return (p.baseScale || 1) * f;
+        }
+
+        function markSelection() {
+            ports.forEach(p => {
+                p.mesh.material.color.setHex(p.nodeId === selectedTarget ? SEL_COLOR : 0xffffff);
+                p.mesh.scale.setScalar(portScale(p));
+            });
+        }
+
+        function selectPort(nodeId) {
+            const node = nodes.find(n => n.id === currentNodeId);
+            const link = node && node.links.find(l => l.nodeId === nodeId);
+            if (!link) return;
+
+            selectedTarget = nodeId;
+            setToolMode('port');
+
+            // Bestehende Richtung übernehmen, damit ein reines Umhängen des
+            // Ziels die Position unverändert lässt
+            const yp = yawPitchFromDir(linkDirection(link));
+            lastReading = { yaw: yp.yaw, pitch: yp.pitch };
+            document.getElementById('tYaw').textContent = yp.yaw.toFixed(1) + '°';
+            document.getElementById('tPitch').textContent = yp.pitch.toFixed(1) + '°';
+            document.getElementById('tDist').value = (typeof link.dist === 'number')
+                ? link.dist
+                : suggestDistance(linkDirection(link));
+
+            fillTargetOptions(nodeId);
+            document.getElementById('tTarget').value = nodeId;
+            markSelection();
+            renderPortList();
+            refreshAddButton();
+            zeigeGehen(nodeId);
+        }
+
+        function clearSelection() {
+            selectedTarget = null;
+            lastReading = null;
+            document.getElementById('tYaw').textContent = '—';
+            document.getElementById('tPitch').textContent = '—';
+            markSelection();
+            renderPortList();
+            fillTargetOptions();
+            refreshAddButton();
+            versteckeGehen();
+        }
+
+        // „Hingehen"-Knopf im Werkzeug: erscheint nach dem Setzen eines Ports
+        const tGo = document.getElementById('tGo');
+        let gehenZu = null;
+
+        function zeigeGehen(nodeId) {
+            const ziel = nodes.find(n => n.id === nodeId);
+            if (!ziel) { versteckeGehen(); return; }
+            gehenZu = nodeId;
+            tGo.textContent = '→ Zu „' + ziel.name + '" gehen';
+            tGo.style.display = 'block';
+            // Das Werkzeug kann gescrollt sein; der Knopf soll sichtbar werden
+            if (tGo.scrollIntoView) tGo.scrollIntoView({ block: 'nearest' });
+        }
+
+        function versteckeGehen() {
+            gehenZu = null;
+            tGo.style.display = 'none';
+        }
+
+        tGo.addEventListener('click', () => {
+            if (!gehenZu) return;
+            const port = ports.find(p => p.nodeId === gehenZu);
+            const ziel = gehenZu;
+            versteckeGehen();
+            goToNode(ziel, port ? { walk: true, towards: port.mesh.position } : undefined);
+        });
+
+        function refreshAddButton() {
+            const imPort = toolMode === 'port';
+            const portGewaehlt = imPort && selectedTarget;
+            const infoGewaehlt = !imPort && selectedTag !== null;
+            document.getElementById('tSelActions').style.display = portGewaehlt ? 'block' : 'none';
+            document.getElementById('tInfoActions').style.display = infoGewaehlt ? 'block' : 'none';
+            tAdd.textContent = (portGewaehlt || infoGewaehlt)
+                ? 'Änderung übernehmen' : 'Übernehmen';
+
+            if (!lastReading) { tAdd.disabled = true; return; }
+            // Beim Infopoint genügt eines von Überschrift und Text — die
+            // Überschrift ist freiwillig, siehe Karte.
+            tAdd.disabled = imPort
+                ? !document.getElementById('tTarget').value
+                : !(document.getElementById('tTitle').value.trim() ||
+                    document.getElementById('tText').value.trim());
+        }
+
+        // Ausgewählten Port entfernen
+        function deletePort(nodeId) {
+            const node = nodes.find(n => n.id === currentNodeId);
+            if (!node) return;
+            const i = node.links.findIndex(l => l.nodeId === nodeId);
+            if (i < 0) return;
+            const ziel = nodes.find(n => n.id === nodeId);
+            node.links.splice(i, 1);
+            touched.add(node.id);
+            rebuildPorts(node);
+            deriveNorth();
+            if (selectedTarget === nodeId) selectedTarget = null;
+            if (gehenZu === nodeId) versteckeGehen();
+            markSelection();
+            saveDraft();
+            renderProgress();
+            renderPortList();
+            refreshAddButton();
+            toast('Port zu ' + (ziel ? ziel.name : nodeId) + ' entfernt');
+        }
+
+        document.getElementById('tDel').addEventListener('click', () => {
+            if (selectedTarget) deletePort(selectedTarget);
+        });
+        document.getElementById('tUnsel').addEventListener('click', clearSelection);
+
+        function fillTargetOptions(behalten) {
+            const sel = document.getElementById('tTarget');
+            const keep = behalten || sel.value;
+            sel.innerHTML = '<option value="">— wählen —</option>';
+            nodes.forEach(n => {
+                if (n.id === currentNodeId) return;
+                const o = document.createElement('option');
+                o.value = n.id;
+                o.textContent = n.name + '  (' + n.id + ')';
+                sel.appendChild(o);
+            });
+
+            // Sinnvoll vorbelegen: gibt es an dieser Station noch einen
+            // Platzhalter, ist der mit Abstand das wahrscheinlichste Ziel.
+            // Erspart bei jedem Port einen Griff in die Liste.
+            if (keep) {
+                sel.value = keep;
+            } else {
+                const node = nodes.find(n => n.id === currentNodeId);
+                const offen = node && node.links.find(l => typeof l.yaw !== 'number');
+                sel.value = offen ? offen.nodeId : '';
+            }
+        }
+
+        // Fortschritt über die ganze Tour
+        function measureProgress() {
+            let alle = 0, fertig = 0;
+            nodes.forEach(n => n.links.forEach(l => {
+                alle++;
+                if (typeof l.yaw === 'number') fertig++;
+            }));
+            return { alle: alle, fertig: fertig };
+        }
+
+        function renderProgress() {
+            const box = document.getElementById('tProgress');
+            if (!box) return;
+            const p = measureProgress();
+            box.textContent = 'Gemessen: ' + p.fertig + ' von ' + p.alle;
+            box.classList.toggle('done', p.fertig === p.alle);
+        }
+
+        tabPort.addEventListener('click', () => setToolMode('port'));
+        tabInfo.addEventListener('click', () => setToolMode('info'));
+        ['tTarget', 'tTitle', 'tText'].forEach(id =>
+            document.getElementById(id).addEventListener('input', refreshAddButton));
+        document.getElementById('tText').addEventListener('input', textZaehlerZeigen);
+        document.getElementById('tTarget').addEventListener('change', refreshAddButton);
+
+        function openTool() {
+            if (!WERKZEUG) return;          // Gastansicht: kein Bearbeiten
+            toolOpen = true;
+            tool.classList.add('open');
+            panel.classList.remove('open');
+            areaBox.classList.remove('open');
+            document.getElementById('toolBtn').classList.add('on');
+            // Betriebsart neu setzen, damit die Felder von Anfang an zur
+            // gewählten Art passen. Sonst blieb im Port-Modus die Zeile
+            // „Fläche" sichtbar, obwohl sie dort nicht gilt — sie folgt dem
+            // Mauszeiger, während yaw und pitch vom letzten Klick stammen.
+            setToolMode(toolMode);
+            fillTargetOptions();
+            document.getElementById('tStation').textContent = currentNodeId || '—';
+            renderProgress();
+            renderPortList();
+            refreshAddButton();
+        }
+
+        function closeTool() {
+            toolOpen = false;
+            tool.classList.remove('open');
+            document.getElementById('toolBtn').classList.remove('on');
+        }
+
+        // Eigener Knopf in der Leiste. Als Menüeintrag lag das Werkzeug
+        // unterhalb des sichtbaren Bereichs und war nicht zu finden.
+        //
+        // In der Gastansicht wird der Knopf ganz entfernt — nicht nur versteckt,
+        // damit er auch nicht über die Tastatur erreichbar bleibt. Das Fenster
+        // selbst bleibt im Dokument stehen: an ihm hängen Anzeigen wie der
+        // Zähler „Gesammelt", die beim Start angesprochen werden.
+        if (WERKZEUG) {
+            document.getElementById('toolBtn').addEventListener('click', () => {
+                if (toolOpen) closeTool(); else openTool();
+            });
+        } else {
+            const k = document.getElementById('toolBtn');
+            if (k) k.remove();
+        }
+        document.getElementById('tClose').addEventListener('click', closeTool);
+
+        tAdd.addEventListener('click', () => {
+            if (!lastReading || !currentNodeId) return;
+            const yawS = lastReading.yaw.toFixed(1);
+            const pitchS = lastReading.pitch.toFixed(1);
+            const node = nodes.find(n => n.id === currentNodeId);
+
+            if (toolMode === 'port') {
+                const target = document.getElementById('tTarget').value;
+                if (!target) return;
+                // Beim Bearbeiten eines ausgewählten Ports kann sich auch das
+                // Ziel geändert haben – dann muss der alte Eintrag weg.
+                if (selectedTarget && selectedTarget !== target) {
+                    const alt = node.links.findIndex(l => l.nodeId === selectedTarget);
+                    if (alt >= 0) node.links.splice(alt, 1);
+                }
+
+                // Gibt es zum selben Ziel schon einen Port, wird er ersetzt statt
+                // ergänzt – sonst lägen zwei Ringe zum gleichen Raum im Bild,
+                // etwa der alte Platzhalter und die neue Messung.
+                const distFeld = parseFloat(document.getElementById('tDist').value);
+                const link = { nodeId: target, yaw: +yawS, pitch: +pitchS };
+                if (isFinite(distFeld) && distFeld > 0) link.dist = +distFeld.toFixed(1);
+                const vorhanden = node.links.findIndex(l => l.nodeId === target);
+                const ersetzt = vorhanden >= 0;
+                if (ersetzt) node.links[vorhanden] = link; else node.links.push(link);
+
+                const zielName = (nodes.find(n => n.id === target) || {}).name || target;
+                const warAusgewaehlt = !!selectedTarget;
+                selectedTarget = null;
+
+                rebuildPorts(node);
+                deriveNorth();                               // neue Messung kann Ausrichtung ergeben
+                markSelection();
+                touched.add(currentNodeId);
+                // Auswahlliste auf den nächsten offenen Platzhalter stellen
+                document.getElementById('tTarget').value = '';
+                fillTargetOptions();
+                toast(warAusgewaehlt ? 'Port zu ' + zielName + ' geändert'
+                                     : (ersetzt ? 'Port zu ' + zielName + ' ersetzt'
+                                                : 'Port zu ' + zielName + ' gesetzt'));
+
+                // Direkt weitergehen können: nach dem Setzen ist der nächste
+                // Schritt fast immer, zur eben verbundenen Station zu laufen und
+                // dort den Rückweg zu messen. Ein Klick ins Bild würde dagegen
+                // eine neue Messung auslösen, weil das Werkzeug offen ist.
+                zeigeGehen(target);
+            } else {
+                const f = tagFields();
+                const title = f.title.value.trim();
+                const text = f.text.value.trim();
+                const url = f.url.value.trim();
+                const label = f.label.value.trim();
+                // Die Überschrift ist freiwillig — ohne Text wäre die Karte
+                // aber leer, also muss mindestens eines von beiden dastehen.
+                if (!title && !text) return;
+
+                if (selectedTag !== null && tags[selectedTag]) {
+                    // Bearbeiten: Inhalt ersetzen, Richtung nur an der
+                    // Platzierung dieser Station – andere Standpunkte desselben
+                    // Infopoints bleiben, wo sie sind.
+                    const tag = tags[selectedTag];
+                    tag.title = title;
+                    tag.text = text;
+                    if (url) tag.link = label ? { url: url, label: label } : { url: url };
+                    else delete tag.link;
+
+                    const orte = tagPlacements(tag);
+                    const ort = orte.find(o => o.nodeId === currentNodeId);
+                    if (ort) { ort.yaw = +yawS; ort.pitch = +pitchS; }
+                    if (!Array.isArray(tag.at)) { tag.yaw = +yawS; tag.pitch = +pitchS; }
+
+                    // Geänderte Punkte müssen mit ausgegeben werden, auch wenn
+                    // sie schon in der Datei stehen
+                    if (newTags.indexOf(tag) < 0) newTags.push(tag);
+
+                    selectedTag = null;
+                    buildTags(node);
+                    markTagSelection();
+                    clearTagFields();
+                    toast('Infopoint „' + tagLabel(tag) + '" geändert');
+                } else {
+                    const tag = { nodeId: currentNodeId, yaw: +yawS, pitch: +pitchS,
+                                  title: title, text: text };
+                    if (url) tag.link = label ? { url: url, label: label } : { url: url };
+                    tags.push(tag);
+                    newTags.push(tag);
+                    buildTags(node);                         // sofort sichtbar
+                    clearTagFields();
+                    toast('Infopoint „' + tagLabel(tag) + '" gesetzt');
+                }
+                renderTagList();
+            }
+
+            lastReading = null;
+            document.getElementById('tYaw').textContent = '—';
+            document.getElementById('tPitch').textContent = '—';
+            saveDraft();
+            renderProgress();
+            renderPortList();
+            refreshAddButton();
+        });
+
+        function updateCount() {
+            const n = touched.size + newTags.length;
+            // Die Anzeigen fehlen, wenn das Werkzeugfenster nicht im Dokument
+            // ist — die veröffentlichte Fassung wirft es heraus. Deshalb prüfen
+            // und nicht blind zugreifen.
+            const zahl = document.getElementById('tCount');
+            if (zahl) zahl.textContent = n;
+            const hinweis = document.getElementById('tDraft');
+            if (!hinweis) return;
+            if (!n) { hinweis.textContent = ''; hinweis.className = 'draft'; return; }
+            hinweis.textContent = draftOk
+                ? 'Im Browser zwischengesichert — übersteht Schließen und Neuladen.'
+                : 'Achtung: Zwischensicherung nicht möglich. Vor dem Schließen kopieren!';
+            hinweis.className = 'draft' + (draftOk ? '' : ' bad');
+        }
+
+        // Einen Link so ausgeben, wie er gespeichert ist – gemessene Ports als
+        // yaw/pitch, noch nicht nachgemessene Platzhalter unverändert als x/y.
+        function linkToCode(l) {
+            if (typeof l.yaw === 'number') {
+                const d = (typeof l.dist === 'number') ? ", dist: " + (+l.dist).toFixed(1) : '';
+                return "{ nodeId: '" + l.nodeId + "', yaw: " + (+l.yaw).toFixed(1) +
+                       ", pitch: " + (+(l.pitch || 0)).toFixed(1) + d + " }";
+            }
+            return "{ nodeId: '" + l.nodeId + "', x: " + l.x + ", y: " + l.y + " }";
+        }
+
+        // Einen Infopoint als Code ausgeben. Kurzform bei einer Platzierung,
+        // `at`-Liste bei mehreren; der Link nur, wenn einer hinterlegt ist.
+        function tagToCode(t) {
+            const orte = tagPlacements(t);
+            const kopf = orte.length > 1
+                ? '{ at: [\n' + orte.map(o =>
+                      "      { nodeId: '" + o.nodeId + "', yaw: " + (+o.yaw).toFixed(1) +
+                      ", pitch: " + (+o.pitch).toFixed(1) + ' }').join(',\n') + '\n  ],'
+                : "{ nodeId: '" + orte[0].nodeId + "', yaw: " + (+orte[0].yaw).toFixed(1) +
+                  ", pitch: " + (+orte[0].pitch).toFixed(1) + ',';
+            let s = kopf +
+                    "\n  title: '" + jsQuote(t.title) + "'," +
+                    "\n  text: '" + jsQuote(t.text || '') + "'";
+            if (t.link && t.link.url) {
+                s += ",\n  link: { url: '" + jsQuote(t.link.url) + "'";
+                if (t.link.label) s += ", label: '" + jsQuote(t.link.label) + "'";
+                s += ' }';
+            }
+            return s + ' }';
+        }
+
+        document.getElementById('tDiscard').addEventListener('click', () => {
+            if (!touched.size && !newTags.length) { toast('Kein Entwurf vorhanden'); return; }
+            discardDraft();
+        });
+
+        document.getElementById('tCopyAll').addEventListener('click', () => {
+            if (!touched.size && !newTags.length) { toast('Noch nichts gesetzt'); return; }
+            const teile = [];
+
+            nodes.forEach(n => {
+                if (!touched.has(n.id)) return;
+                const zeilen = n.links.map(l => '    ' + linkToCode(l)).join(',\n');
+                teile.push('// ' + n.name + ' (' + n.id + ') — links komplett ersetzen\n' +
+                           'links: [\n' + zeilen + '\n]');
+            });
+
+            if (newTags.length) {
+                const zeilen = newTags.map(tagToCode).join(',\n');
+                teile.push('// Infopoints — neu gesetzte einfügen, geänderte ersetzen\n' + zeilen);
+            }
+
+            const out = teile.join('\n\n');
+            console.log(out);
+            if (navigator.clipboard) navigator.clipboard.writeText(out).then(
+                () => toast('In die Zwischenablage kopiert'),
+                () => toast('Kopieren nicht möglich — Ausgabe steht in der Konsole'));
+        });
+
+        // ===== PORTS DIESER STATION: Übersicht und Löschen =====
+        function renderPortList() {
+            const box = document.getElementById('tPorts');
+            const node = nodes.find(n => n.id === currentNodeId);
+            box.innerHTML = '';
+            if (!node || !node.links.length) {
+                box.innerHTML = '<div class="leer">Noch kein Port gesetzt.</div>';
+                return;
+            }
+            node.links.forEach(link => {
+                const ziel = nodes.find(n => n.id === link.nodeId);
+                const row = document.createElement('div');
+                row.className = 'prow' + (link.nodeId === selectedTarget ? ' sel' : '');
+                row.title = 'Zum Bearbeiten anwählen';
+
+                const label = document.createElement('span');
+                label.textContent = ziel ? ziel.name : link.nodeId;
+                if (typeof link.yaw !== 'number') {
+                    const hint = document.createElement('em');
+                    hint.textContent = 'Platzhalter';
+                    label.appendChild(hint);
+                }
+                row.appendChild(label);
+                // Zeile anwählen — auch aus der Liste, nicht nur im Bild
+                label.addEventListener('click', () => {
+                    if (link.nodeId === selectedTarget) clearSelection();
+                    else selectPort(link.nodeId);
+                });
+
+                const del = document.createElement('button');
+                del.setAttribute('aria-label', 'Port entfernen');
+                del.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>';
+                del.addEventListener('click', ev => { ev.stopPropagation(); deletePort(link.nodeId); });
+                row.appendChild(del);
+                box.appendChild(row);
+            });
+        }
+
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            camera.fov = Math.max(FOV_MIN, camera.fov - 9);
+            camera.updateProjectionMatrix();
+        });
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            camera.fov = Math.min(FOV_MAX, camera.fov + 9);
+            camera.updateProjectionMatrix();
+        });
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            yaw = 0; pitch = 0;
+            camera.fov = BASE_FOV;
+            camera.updateProjectionMatrix();
+        });
+        document.getElementById('fullBtn').addEventListener('click', () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        });
+
+        // Automatischer Rundgang: alle Stationen der Reihe nach.
+        // Währenddessen tritt die übrige Bedienung zurück, nur Pause bleibt –
+        // so wie es die Anforderung für die geführte Tour beschreibt.
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const ICON_PLAY  = 'M8 5v14l11-7z';
+        const ICON_PAUSE = 'M6 5h4v14H6zm8 0h4v14h-4z';
+
+        function setPlayIcon(spielt) {
+            playIcon.querySelector('path').setAttribute('d', spielt ? ICON_PAUSE : ICON_PLAY);
+            playBtn.setAttribute('data-tip', spielt ? 'Pause' : 'Abspielen');
+            playBtn.classList.toggle('on', spielt);
+            viewer.classList.toggle('presenting', spielt);
+        }
+
+        function stopAutoplay() {
+            if (!autoplay) return;
+            clearInterval(autoplay);
+            autoplay = null;
+            setPlayIcon(false);
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (autoplay) { stopAutoplay(); return; }
+            panel.classList.remove('open');
+            areaBox.classList.remove('open');
+            setPlayIcon(true);
+            autoplay = setInterval(() => {
+                if (traveling) return;
+                const i = nodes.findIndex(n => n.id === currentNodeId);
+                goToNode(nodes[(i + 1) % nodes.length].id);
+            }, 4600);
+        });
+
+        // =====================================================================
+        //  BILDSCHLEIFE
+        // =====================================================================
+        const needle = document.getElementById('needle');
+
+        function frame() {
+            requestAnimationFrame(frame);
+            camera.lookAt(dirFromYawPitch(yaw, pitch).add(camera.position));
+            camera.updateMatrixWorld();
+            needle.setAttribute('transform', 'rotate(' + (-yaw) + ' 22 22)');
+            // Der Ring muss auch dann folgen, wenn sich nur der Blick dreht
+            // oder gezoomt wird, ohne dass die Maus bewegt wird.
+            updateReticle(lastPointer);
+            positionPortHint();
+            planAktualisieren();       // Blickkegel dreht mit
+            positionTags();
+            renderer.render(scene, camera);
+        }
+
+        // ===== START =====
+        resizeView();
+        window.addEventListener('resize', resizeView);
+
+        // Entwurf der letzten Sitzung zurückholen, bevor irgendetwas gebaut wird.
+        // In der Gastansicht nicht: ein Besucher soll die Tour so sehen, wie sie
+        // in der Datei steht, und nicht einen Entwurf aus seinem Browser.
+        const entwurfStand = WERKZEUG ? loadDraft() : null;
+        deriveNorth();
+        renderSummary();
+        updateCount();
+
+        // Aus einem geteilten Link genau dort öffnen, wo der Absender stand
+        const ausLink = readHash();
+        if (ausLink) {
+            yaw = ausLink.yaw;
+            pitch = ausLink.pitch;
+            camera.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, ausLink.fov));
+            camera.updateProjectionMatrix();
+        }
+        goToNode(ausLink ? ausLink.id : START_NODE,
+                 ausLink ? { variant: ausLink.variant, exakt: true } : undefined);
+        frame();
+
+        if (entwurfStand) {
+            const wann = entwurfStand === 'unbekannt' ? '' :
+                new Date(entwurfStand).toLocaleString('de-DE',
+                    { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            setTimeout(() => toast('Entwurf' + (wann ? ' vom ' + wann : '') +
+                                   ' wiederhergestellt: ' + (touched.size + newTags.length) + ' Einträge'), 1400);
+        }
+    </script>
+</body>
+</html>
