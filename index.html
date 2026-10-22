@@ -448,6 +448,30 @@
                               border: 6px solid transparent; border-top: 7px solid var(--gold2); border-bottom: 0; }
         .portetikett:hover { background: var(--gold3); }
         .portetikett:hover::after { border-top-color: var(--gold3); }
+
+        /* 3D-Vorschau-Karte unten rechts (klein, in der Ecke, damit sie das Bild nicht verdeckt) */
+        .dhcard { display: block; width: 150px; padding: 4px 4px 6px; border: none; border-radius: 9px; cursor: pointer;
+                  background: rgba(32,40,41,0.86); backdrop-filter: blur(8px); color: var(--dust);
+                  box-shadow: 0 3px 12px rgba(0,0,0,0.5); text-align: left; font-family: var(--font-ui);
+                  transition: transform 0.15s, background 0.15s; }
+        .dhcard:hover { transform: scale(1.07); background: rgba(32,40,41,1); }
+        .dhcard.on { outline: 2px solid var(--fichte); }
+        .dhmap { position: relative; display: block; border-radius: 6px; overflow: hidden; background: #eef0ea; }
+        .dhmap img { display: block; width: 100%; height: auto; }
+        .dhme { position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%;
+                background: var(--fichte); border: 2px solid var(--wald); display: none;
+                animation: dhpuls 1.8s infinite; }
+        @keyframes dhpuls { 0% { box-shadow: 0 0 0 0 rgba(187,208,52,0.7); } 70% { box-shadow: 0 0 0 9px rgba(187,208,52,0); }
+                            100% { box-shadow: 0 0 0 0 rgba(187,208,52,0); } }
+        .dhrow { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 5px 3px 0; }
+        .dhname { font-family: var(--font-head); font-size: 13px; font-weight: 600; line-height: 1.1; overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap; }
+        .dh3d { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: var(--graphite); background: var(--fichte);
+                border-radius: 999px; padding: 2px 7px 3px; }
+        .station { display: none; }              /* der Name steht jetzt in der Karte */
+        .bar-right { align-items: flex-end; }
+        @media (max-width: 560px) { .dhcard { width: 100px; padding: 3px 3px 4px; border-radius: 8px; }
+                                    .dhname { font-size: 11.5px; } .dh3d { display: none; } .dhme { width: 8px; height: 8px; } }
 </style>
 </head>
 <body>
@@ -521,24 +545,7 @@
                 <button class="btn" id="resetBtn" data-tip="Ansicht zurücksetzen">
                     <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>
                 </button>
-                <button class="btn" id="dhBtn" data-tip="Wohnung von oben (3D)">
-                    <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.5 7.9 12 11.5 5.5 7.9 12 4.3zM5 9.6l6 3.3v6.6l-6-3.3V9.6zm14 0v6.6l-6 3.3v-6.6l6-3.3z"/></svg>
-                </button>
             </div>
-            <div class="station" id="stationName">—</div>
-            <!-- erscheint nur bei Stationen mit mehreren Aufnahmen -->
-            <div class="pill variants" id="variantBar"></div>
-        </div>
-
-        <!-- Bereichsliste -->
-        <div class="areas" id="areaList"></div>
-
-        <!-- 3D-Ansicht der Wohnung (Draufsicht / Puppenhaus), wird erst beim ersten Öffnen geladen -->
-        <div class="dhbox" id="dhBox"></div>
-
-
-        <!-- Steuerung unten rechts -->
-        <div class="bar-right">
             <button class="btn" id="toolBtn" data-tip="Ports &amp; Infopoints setzen">
                 <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v2.06a7 7 0 0 1 5.94 5.94H21a1 1 0 0 1 0 2h-2.06A7 7 0 0 1 13 18.94V21a1 1 0 0 1-2 0v-2.06A7 7 0 0 1 5.06 13H3a1 1 0 0 1 0-2h2.06A7 7 0 0 1 11 5.06V3a1 1 0 0 1 1-1zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
             </button>
@@ -553,6 +560,25 @@
             </button>
             <button class="btn" id="menuBtn" data-tip="Weitere Optionen">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div class="station" id="stationName">—</div>
+            <!-- erscheint nur bei Stationen mit mehreren Aufnahmen -->
+            <div class="pill variants" id="variantBar"></div>
+        </div>
+
+        <!-- Bereichsliste -->
+        <div class="areas" id="areaList"></div>
+
+        <!-- 3D-Ansicht der Wohnung (Draufsicht / Puppenhaus), wird erst beim ersten Öffnen geladen -->
+        <div class="dhbox" id="dhBox"></div>
+
+
+        <!-- Steuerung unten rechts -->
+        <div class="bar-right">
+            <!-- 3D-Vorschau: Draufsicht mit Standort, öffnet die 3D-Ansicht (Entwurf 010, Variante B) -->
+            <button class="dhcard" id="dhBtn" aria-label="Wohnung von oben (3D) öffnen">
+                <span class="dhmap"><img src="./3d/vorschau.jpg" alt=""><i class="dhme" id="dhMe"></i></span>
+                <span class="dhrow"><span class="dhname" id="dhName">—</span><span class="dh3d">3D</span></span>
             </button>
         </div>
 
@@ -1041,6 +1067,25 @@
         //  Peilung der Tour (yaw + north) minus DREHUNG_3D.
         // =====================================================================
         const DREHUNG_3D = -117.82;
+        // Plan-Koordinaten der Ports (Meter, x nach Osten, z nach Süden) für den Standortpunkt auf der 3D-Vorschau.
+        // Vorschaubild = Ausschnitt x -2,0..16,2 / z -4,2..6,4. Stationen ohne Eintrag (draußen) bekommen keinen Punkt.
+        const DH_PORTS = {
+            'gs-0081': [0.76, 2.03], 'gs-0079': [3.04, 3.55], 'gs-0080': [3.1, 0.68], 'gs-0077': [4.42, 1.63],
+            'gs-0075': [4.52, 2.95], 'gs-0073': [6.8, 2.44], 'gs-0074': [6.85, 1.11], 'gs-0068': [9.39, 1.07],
+            'gs-0072': [9.52, 3.36], 'gs-0066': [11.13, 3.95], 'gs-0069': [12.3, 0.49], 'gs-0082': [11.35, 2.2],
+            'gs-0065': [14.4, 4.53], 'gs-0060': [9.31, -0.74], 'gs-0061': [14.54, -1.17], 'gs-0063': [15.1, 2.99],
+            'gs-0059': [6.02, -2.42]
+        };
+        function aktualisiere3DKarte(node) {
+            const name = document.getElementById('dhName'), punkt = document.getElementById('dhMe');
+            if (!name || !punkt) return;
+            name.textContent = node.name;
+            const xz = DH_PORTS[node.id];
+            if (!xz) { punkt.style.display = 'none'; return; }
+            // Abbildung Plan -> Vorschaubild (Meter in Anteile des Bildes), aus der Aufnahme der Draufsicht abgeleitet
+            const u = (240 + (xz[0] - 7.3) * 23.12 - 25) / 421, v = (207 + (xz[1] - 1.2) * 23.12 - 82) / 245;
+            punkt.style.left = (u * 100) + '%'; punkt.style.top = (v * 100) + '%'; punkt.style.display = 'block';
+        }
 
         // =====================================================================
         //  NORDAUSRICHTUNG DER BILDER
@@ -2203,6 +2248,7 @@
         // Alles, was beim Ankommen an der Oberfläche nachzuziehen ist
         function setStationChrome(node) {
             document.getElementById('stationName').textContent = node.name;
+            aktualisiere3DKarte(node);
             document.getElementById('tStation').textContent = node.id;
             lastReading = null;
             document.getElementById('tYaw').textContent = '—';
